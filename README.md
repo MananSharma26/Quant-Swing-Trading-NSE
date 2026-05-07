@@ -547,9 +547,47 @@ The root directory is controlled by `DATA_DIR` in `.env` (default: `./data`).
 
 ---
 
+## Milestone 10: Broker Mapping and OMS Skeleton
+
+### What was added
+
+- **`src/trading_engine/broker/zerodha/mappers.py`** — Pure mapping functions that convert raw Zerodha API dicts into internal domain models: `map_zerodha_order`, `map_zerodha_trade`, `map_zerodha_position`, `map_zerodha_instrument`, and scalar mappers for status, side, order type, product, and exchange.
+- **`src/trading_engine/execution/state_machine.py`** — `OrderStateMachine`: validates every order status transition against a defined table. Invalid transitions raise `OrderStateTransitionError`.
+- **`src/trading_engine/execution/ledger.py`** — `OrderLedger`: in-memory store for `InternalOrder`, `TradeFill`, and `RiskDecision` objects. All status updates go through the state machine.
+- **`src/trading_engine/execution/order_manager.py`** — `OrderManager`: converts `OrderIntent` objects into `InternalOrder` objects, runs the risk engine (if configured), and stores everything in the ledger. Never calls a broker API.
+- **`src/trading_engine/common/exceptions.py`** — Added `OrderStateTransitionError`, `OrderNotFoundError`, `BrokerMappingError`.
+
+### Why broker response normalisation matters
+
+Zerodha returns raw dicts with string status values like `"COMPLETE"`, `"TRIGGER PENDING"`, and product codes like `"MIS"`. These must be mapped to the engine's `OrderStatus`, `ProductType`, etc. before any internal logic can use them. The mapper layer makes this conversion explicit, testable without credentials, and isolated from the rest of the codebase.
+
+### What the order state machine does
+
+`OrderStateMachine.transition(current, next)` either returns the target status (valid transition) or raises `OrderStateTransitionError` (invalid). This prevents order state from being corrupted by out-of-sequence broker callbacks or logic bugs. Terminal states (`FILLED`, `CANCELLED`, `FAILED`, `REJECTED`) have no allowed outgoing transitions.
+
+### What the in-memory ledger does
+
+`OrderLedger` is the single source of truth for order state during a session. It stores orders, fills, and risk decisions. `update_order_status` enforces the state machine on every write. Lookups by `internal_order_id` raise `OrderNotFoundError` for unknown IDs. No database or file persistence is used in this milestone.
+
+### Confirmation
+
+- Real order placement is **not implemented**. `place_order()`, `modify_order()`, and `cancel_order()` remain blocked on `ZerodhaBroker`.
+- `LIVE_TRADING_ENABLED` remains `false`.
+- `mark_submitted()` and `mark_broker_update()` on `OrderManager` update **internal state only** — they do not call Zerodha APIs.
+
+### Commands to verify
+
+```bash
+python3 -m pytest -v                                     # 784 tests, all pass
+python3 -m ruff check src tests scripts                  # no errors
+python3 -m ruff format --check src tests scripts         # no reformats needed
+```
+
+---
+
 ## Next milestone
 
-**Milestone 10: Opening Range Breakout strategy**
+**Milestone 11: Read-only broker reconciliation**
 
 ---
 

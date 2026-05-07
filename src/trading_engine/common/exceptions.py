@@ -33,3 +33,15 @@ class MarketDataError(TradingEngineError):
 
 class OrderValidationError(TradingEngineError):
     """Raised when an order intent fails validation."""
+
+
+class OrderStateTransitionError(TradingEngineError):
+    """Raised when an illegal order status transition is attempted."""
+
+
+class OrderNotFoundError(TradingEngineError):
+    """Raised when an order lookup fails because the ID is not in the ledger."""
+
+
+class BrokerMappingError(TradingEngineError):
+    """Raised when a raw broker response cannot be mapped to an internal model."""
