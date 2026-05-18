@@ -180,6 +180,105 @@ class ZerodhaBroker(Broker):
         )
 
     # ------------------------------------------------------------------
-    # Order placement — BLOCKED (inherited from Broker base)
-    # place_order, modify_order, cancel_order all raise LiveTradingDisabledError.
+    # Order placement — gated through LiveExecutionSafetyGuard
     # ------------------------------------------------------------------
+
+    def place_order(  # type: ignore[override]
+        self,
+        order_intent: Any,
+        pilot_config: Any,
+        approval_decision: Any,
+        risk_decision: Any | None = None,
+        safety_guard: Any | None = None,
+    ) -> str:
+        """Place a real order via Zerodha Kite Connect.
+
+        This method requires ALL of the following to be in place:
+          - A LiveExecutionSafetyGuard that passes assert_pilot_order_allowed().
+          - An ApprovalDecision with status APPROVED.
+          - A LivePilotConfig with live_order_execution_enabled=True and
+            live_order_pilot_enabled=True.
+
+        Args:
+            order_intent:       The OrderIntent describing the order.
+            pilot_config:       LivePilotConfig with execution constraints.
+            approval_decision:  ApprovalDecision from LiveOrderApprovalGate.
+            risk_decision:      Optional risk engine decision.
+            safety_guard:       LiveExecutionSafetyGuard instance.  If None,
+                                a default guard (no kill switch, using self._settings)
+                                is used.
+
+        Returns:
+            The Zerodha broker_order_id string.
+
+        Raises:
+            SafetyError: if any safety check fails.
+            BrokerConnectionError: if not connected.
+        """
+        from trading_engine.live_execution.safety import LiveExecutionSafetyGuard
+
+        self._require_connected()
+
+        guard = safety_guard or LiveExecutionSafetyGuard(
+            settings=self._settings,
+            logger=self._logger,
+        )
+        guard.assert_pilot_order_allowed(
+            order_intent=order_intent,
+            config=pilot_config,
+            approval_decision=approval_decision,
+            risk_decision=risk_decision,
+        )
+
+        # Map OrderIntent fields to Zerodha Kite params.
+        variety = "regular"
+        transaction_type = str(order_intent.side).upper()
+        order_type = str(order_intent.order_type).upper()
+        # Zerodha uses "SL-M" not "SL_M"
+        if order_type == "SL_M":
+            order_type = "SL-M"
+
+        kite_params: dict[str, Any] = {
+            "variety": variety,
+            "exchange": str(order_intent.exchange).upper(),
+            "tradingsymbol": str(order_intent.symbol).upper(),
+            "transaction_type": transaction_type,
+            "quantity": int(order_intent.quantity),
+            "order_type": order_type,
+            "product": str(order_intent.product).upper(),
+        }
+
+        price = getattr(order_intent, "price", None)
+        if price is not None:
+            kite_params["price"] = float(price)
+
+        trigger_price = getattr(order_intent, "trigger_price", None)
+        if trigger_price is not None:
+            kite_params["trigger_price"] = float(trigger_price)
+
+        # Tag with strategy_id for reconciliation (max 20 chars in Kite).
+        strategy_id = str(getattr(order_intent, "strategy_id", "pilot"))
+        kite_params["tag"] = strategy_id[:20]
+
+        self._logger.info(
+            "ZerodhaBroker.place_order: placing %s %s %s qty=%s",
+            transaction_type,
+            order_intent.quantity,
+            order_intent.symbol,
+            order_intent.quantity,
+        )
+
+        response = self._kite.place_order(**kite_params)
+
+        # Kite returns {"order_id": "..."} or just the order_id string.
+        if isinstance(response, dict):
+            broker_order_id = str(response.get("order_id", response))
+        else:
+            broker_order_id = str(response)
+
+        self._logger.info(
+            "ZerodhaBroker.place_order: order placed — broker_order_id=%r", broker_order_id
+        )
+        return broker_order_id
+
+    # modify_order, cancel_order still raise LiveTradingDisabledError (inherited from Broker).

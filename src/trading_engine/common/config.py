@@ -40,6 +40,18 @@ class Settings(BaseSettings):
     live_trading_enabled: bool = Field(default=False)
     paper_trading_enabled: bool = Field(default=True)
 
+    # Live order execution pilot flags — ALL default to False/disabled
+    # These must be explicitly set to True to enable any real order placement.
+    live_order_execution_enabled: bool = Field(default=False)
+    live_order_pilot_enabled: bool = Field(default=False)
+
+    # Pilot order constraints — conservative safe defaults
+    live_max_order_quantity: int = Field(default=1, gt=0)
+    live_allowed_symbols: list[str] = Field(default_factory=list)
+    live_allowed_exchange: str = Field(default="NSE")
+    live_allowed_product: str = Field(default="MIS")
+    live_allowed_order_types: list[str] = Field(default_factory=lambda: ["MARKET", "LIMIT"])
+
     # Risk limits
     max_daily_loss: float = Field(default=1000.0, gt=0)
     max_order_value: float = Field(default=10000.0, gt=0)
@@ -59,7 +71,9 @@ class Settings(BaseSettings):
             f"app_env={self.app_env!r}, "
             f"log_level={self.log_level!r}, "
             f"live_trading_enabled={self.live_trading_enabled}, "
-            f"paper_trading_enabled={self.paper_trading_enabled})"
+            f"paper_trading_enabled={self.paper_trading_enabled}, "
+            f"live_order_execution_enabled={self.live_order_execution_enabled}, "
+            f"live_order_pilot_enabled={self.live_order_pilot_enabled})"
         )
 
     def __str__(self) -> str:

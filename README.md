@@ -22,7 +22,7 @@ A personal Zerodha-connected Indian equity intraday trading engine.
 
 ## Current milestone
 
-**Milestone 8 — Paper Trading Engine v1** (complete)
+**Milestone 16 — Live Order Execution Pilot** (complete)
 
 Added a complete paper trading engine that simulates strategy execution against
 pre-loaded bar data. No Zerodha WebSocket. No real order placement. No credentials.
@@ -967,9 +967,53 @@ Output (JSON, no Zerodha calls, no credentials required):
 
 ---
 
-## Next milestone
+## Milestone 16: Live Order Execution Pilot
 
-*TBD*
+### What was added
+
+| Component | Location | Description |
+|---|---|---|
+| New `Settings` fields | `common/config.py` | `live_order_execution_enabled`, `live_order_pilot_enabled`, `live_max_order_quantity`, `live_allowed_symbols`, `live_allowed_exchange`, `live_allowed_product`, `live_allowed_order_types` |
+| `LivePilotConfig` | `live_execution/pilot_config.py` | Dataclass wrapping all pilot constraints; `from_settings()` classmethod |
+| `assert_pilot_order_allowed()` | `live_execution/safety.py` | Full 10-check gate: both flags, kill switch, risk, approval, symbol/exchange/product/type/qty |
+| `ZerodhaBroker.place_order()` | `broker/zerodha/client.py` | Real Kite placement gated through `LiveExecutionSafetyGuard` |
+| `LiveOrderPilotExecutor` | `live_execution/pilot_executor.py` | Orchestrates risk → approval → safety → broker → audit |
+| `PilotOrderResult` | `live_execution/pilot_executor.py` | Result dataclass with `to_dict()` |
+| `OrderVerificationService` | `live_execution/order_verification.py` | Polls broker to confirm placed order appears in order list |
+| `scripts/live_order_pilot.py` | `scripts/` | CLI: requires `--i-understand-this-places-real-orders` + interactive phrase confirmation |
+
+### Safety model
+
+Three flags must ALL be true to place any real order:
+
+```
+LIVE_TRADING_ENABLED=true
+LIVE_ORDER_EXECUTION_ENABLED=true
+LIVE_ORDER_PILOT_ENABLED=true
+```
+
+Additionally, per-order checks (via `assert_pilot_order_allowed`):
+- Kill switch not active
+- Risk engine approved (if provided)
+- Approval gate returned APPROVED
+- Symbol in `LIVE_ALLOWED_SYMBOLS`
+- Exchange matches `LIVE_ALLOWED_EXCHANGE`
+- Product matches `LIVE_ALLOWED_PRODUCT`
+- Order type in `LIVE_ALLOWED_ORDER_TYPES`
+- Quantity ≤ `LIVE_MAX_ORDER_QUANTITY`
+
+All defaults are safe (`false`, `1`, `[]`). Empty `LIVE_ALLOWED_SYMBOLS` blocks all orders.
+
+### Tests
+
+| File | Coverage |
+|---|---|
+| `tests/unit/live_execution/test_pilot_config.py` | LivePilotConfig defaults, from_settings(), partial settings |
+| `tests/unit/live_execution/test_safety.py` | All 10 assert_pilot_order_allowed() checks, kill switch, case-insensitivity |
+| `tests/unit/live_execution/test_live_order_gating.py` | ZerodhaBroker.place_order() end-to-end gating |
+| `tests/unit/live_execution/test_pilot_executor.py` | Happy path, risk rejection, broker failure, manual approval |
+| `tests/unit/live_execution/test_order_verification.py` | Found, not found, retry, broker error |
+| `tests/unit/scripts/test_live_order_pilot.py` | CLI parsing, safety flag, pilot flag checks |
 
 ---
 

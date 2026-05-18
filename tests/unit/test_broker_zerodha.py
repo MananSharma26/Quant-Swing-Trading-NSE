@@ -250,20 +250,42 @@ class TestStreamTicks:
 
 
 # ---------------------------------------------------------------------------
-# Safety gate — live order placement must be blocked
+# Safety gate — order placement gated through safety guard
 # ---------------------------------------------------------------------------
 
 
 class TestOrderPlacementBlocked:
-    def test_place_order_raises(self, connected_broker: ZerodhaBroker) -> None:
-        with pytest.raises(LiveTradingDisabledError):
+    def test_place_order_blocked_when_pilot_disabled(self, connected_broker: ZerodhaBroker) -> None:
+        from trading_engine.common.exceptions import SafetyError
+        from trading_engine.live_execution.models import ApprovalDecision, ApprovalStatus
+        from trading_engine.live_execution.pilot_config import LivePilotConfig
+        from trading_engine.live_execution.safety import LiveExecutionSafetyGuard
+        from trading_engine.strategy.signals import OrderIntent
+        from datetime import UTC, datetime
+
+        config = LivePilotConfig()  # all flags False by default
+        approval = ApprovalDecision(
+            approval_id="x",
+            status=ApprovalStatus.APPROVED,
+            decided_at=datetime.now(tz=UTC),
+        )
+        intent = OrderIntent(
+            strategy_id="t",
+            symbol="RELIANCE",
+            exchange="NSE",
+            side="BUY",
+            quantity=1,
+            order_type="MARKET",
+            product="MIS",
+        )
+        guard = LiveExecutionSafetyGuard(object())
+
+        with pytest.raises(SafetyError, match="LIVE_ORDER_EXECUTION_ENABLED"):
             connected_broker.place_order(
-                tradingsymbol="RELIANCE",
-                exchange="NSE",
-                quantity=10,
-                order_type="MARKET",
-                product="MIS",
-                transaction_type="BUY",
+                order_intent=intent,
+                pilot_config=config,
+                approval_decision=approval,
+                safety_guard=guard,
             )
 
     def test_modify_order_raises(self, connected_broker: ZerodhaBroker) -> None:
@@ -274,7 +296,39 @@ class TestOrderPlacementBlocked:
         with pytest.raises(LiveTradingDisabledError):
             connected_broker.cancel_order(order_id="ord_abc")
 
-    def test_place_order_blocked_even_when_disconnected(self, broker: ZerodhaBroker) -> None:
-        # Safety gate must not depend on connection state.
-        with pytest.raises(LiveTradingDisabledError):
-            broker.place_order(tradingsymbol="RELIANCE")
+    def test_place_order_requires_connection(self, broker: ZerodhaBroker) -> None:
+        from trading_engine.common.exceptions import BrokerConnectionError
+        from trading_engine.live_execution.models import ApprovalDecision, ApprovalStatus
+        from trading_engine.live_execution.pilot_config import LivePilotConfig
+        from trading_engine.live_execution.safety import LiveExecutionSafetyGuard
+        from trading_engine.strategy.signals import OrderIntent
+        from datetime import UTC, datetime
+
+        config = LivePilotConfig(
+            live_order_execution_enabled=True,
+            live_order_pilot_enabled=True,
+            allowed_symbols=["RELIANCE"],
+        )
+        approval = ApprovalDecision(
+            approval_id="x",
+            status=ApprovalStatus.APPROVED,
+            decided_at=datetime.now(tz=UTC),
+        )
+        intent = OrderIntent(
+            strategy_id="t",
+            symbol="RELIANCE",
+            exchange="NSE",
+            side="BUY",
+            quantity=1,
+            order_type="MARKET",
+            product="MIS",
+        )
+        guard = LiveExecutionSafetyGuard(object())
+
+        with pytest.raises(BrokerConnectionError):
+            broker.place_order(
+                order_intent=intent,
+                pilot_config=config,
+                approval_decision=approval,
+                safety_guard=guard,
+            )
