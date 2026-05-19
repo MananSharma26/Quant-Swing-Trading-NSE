@@ -210,6 +210,64 @@ python3 -m ruff format --check src tests scripts
 
 ---
 
+**Milestone 8b — First-Hour Momentum Diagnostics and OOS Validation** (complete)
+
+Added a diagnostic and out-of-sample (OOS) validation script for the
+First-Hour Momentum strategy.  Also fixed the sweep metrics bug where
+`gross_pnl` was incorrectly read from `m.realized_pnl` (which has a FIFO
+accumulation bug) — it is now computed as `total_pnl + total_fees` and
+cross-checked against fill-level FIFO pairing.
+
+**What the diagnostics script produces:**
+
+- Breaks fills down into completed round-trip trades using FIFO pairing.
+- Computes per-group metrics (trade count, net P&L, gross P&L, fees, win
+  rate, profit factor, average trade P&L, max drawdown) broken down by:
+  symbol, month, quarter, day of week, side, entry-hour bucket.
+- Runs a train/test split and reports: all-symbols train vs test, per-symbol
+  train vs test, which symbols are net-positive OOS, and whether excluding
+  the worst training symbol improves OOS P&L.
+- Emits explicit warnings for groups with fewer than 30 trades.
+- Saves `reports/first_hour_momentum_analysis.json` and
+  `reports/first_hour_momentum_symbol_results.csv`.
+
+**Best config found in sweep (as of first run):**
+
+| Parameter | Value |
+|---|---|
+| momentum_window_minutes | 15 |
+| min_first_window_return_bps | 60 |
+| stop_loss_bps | 60 |
+| target_bps | None |
+| latest_entry_time | 10:30 |
+| allow_shorts | False |
+
+Net P&L ≈ −8 894, gross P&L ≈ −130, fees ≈ 8 764, profit factor ≈ 0.986,
+max drawdown 1.9 %, 163 completed trades over 5 symbols.  Strategy is
+near-breakeven before costs; further symbol filtering and regime filtering
+are the logical next steps.
+
+```bash
+# Analyse fills from the default backtest report (no re-run):
+python3 scripts/analyze_first_hour_momentum.py
+
+# Re-run backtest with best config, then analyse:
+python3 scripts/analyze_first_hour_momentum.py --rerun
+
+# Custom train/test boundaries:
+python3 scripts/analyze_first_hour_momentum.py \
+  --train-start 2025-01-01 --train-end 2025-06-30 \
+  --test-start  2025-07-01 --test-end  2026-01-31
+
+# Run tests:
+python3 -m pytest tests/unit/scripts/test_analyze_first_hour_momentum.py -v
+```
+
+> **WARNING**: OOS results are based on a single test window and a small
+> number of symbols — treat conclusions as exploratory, not definitive.
+
+---
+
 **Milestone 8 — First-Hour Momentum to Close Strategy** (complete)
 
 Added the First-Hour Momentum to Close intraday strategy in backtest-only mode.
