@@ -23,7 +23,46 @@ A personal Zerodha-connected Indian equity intraday trading engine.
 
 ## Current milestone
 
-**Milestone 17 — Production Hardening and Operating Checklist** (complete)
+**Milestone 18 — Parallelized Symbol Validation** (complete)
+
+Added a high-performance, parallelized validation script for symbol-specific
+parameter sweeps. This allows evaluating thousands of (symbol, parameter)
+combinations across the full NSE universe in minutes using local Parquet data.
+
+**What was added:**
+
+| File | Description |
+|---|---|
+| `scripts/validate_first_hour_symbol_specific.py` | Parallelized validator with `--workers`, `--fast`, and `--sample-months` |
+| `tests/unit/scripts/test_first_hour_symbol_specific.py` | 7 unit tests for parallelization, filtering, and deterministic output |
+
+**Key features:**
+
+- **Parallel Execution:** Uses `ProcessPoolExecutor` to distribute backtests across CPU cores.
+- **Fast Mode:** `--fast` flag for quick exploratory runs on a subset of symbols and combinations.
+- **Month Filtering:** `--sample-months YYYY-MM` allows testing against specific time periods (e.g., only high-volatility months).
+- **Deterministic Output:** Results are sorted by symbol and performance, ensuring consistent CSV/JSON reports.
+- **Progress Tracking:** Real-time terminal reporting of completion %, elapsed time, and ETA.
+
+**How to run validation:**
+
+```bash
+# Run on all symbols with 4 workers
+python3 scripts/validate_first_hour_symbol_specific.py --workers 4
+
+# Run fast exploratory mode (TCS, INFY, ICICIBANK; 25 combos)
+python3 scripts/validate_first_hour_symbol_specific.py --fast
+
+# Test specific months only
+python3 scripts/validate_first_hour_symbol_specific.py --sample-months 2025-01 2025-06 2025-11
+
+# Limit to specific symbols and max combinations
+python3 scripts/validate_first_hour_symbol_specific.py --symbols RELIANCE SBIN --max-combos 50
+```
+
+---
+
+## Previous milestones
 
 Added operational hardening for the live order pilot: preflight checks, safety
 regression tests, operating runbooks, and an updated environment template.
