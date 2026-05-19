@@ -210,6 +210,101 @@ python3 -m ruff format --check src tests scripts
 
 ---
 
+**Milestone 8 — First-Hour Momentum to Close Strategy** (complete)
+
+Added the First-Hour Momentum to Close intraday strategy in backtest-only mode.
+No live trading, no broker API calls, no credentials required.
+
+**Context — why a third strategy?**
+
+ORB (Milestone 6) takes entries right at the session open breakout.
+VWAP Pullback (Milestone 7) waits for an uptrend confirmation before entering.
+Both strategies struggled on choppy or news-driven days where the initial
+breakout reversed quickly.
+
+First-Hour Momentum targets a different edge: observe the first N minutes
+(the "momentum window") to assess whether the market has established a
+strong directional bias, then enter only on a continuation bar.  Compared
+to ORB, the longer observation window filters out many false breakouts.
+Compared to VWAP Pullback, it requires a quantified return threshold in bps
+rather than a qualitative slope, making it easier to sweep over parameters.
+
+**What First-Hour Momentum does:**
+
+1. For each symbol, accumulate the first `momentum_window_minutes` bars of
+   the session into a "first window" (records open, high, low, close, volume).
+2. Compute `first_window_return_bps = (fw_close / fw_open - 1) × 10 000`
+   and `opening_range_bps = (fw_high / fw_low - 1) × 10 000`.
+3. After the window is complete, enter LONG on any subsequent bar where:
+   - `first_window_return_bps >= min_first_window_return_bps`
+   - `opening_range_bps` is within `[min_opening_range_bps, max_opening_range_bps]`
+   - `bar.close > first_window_close` (price still extending momentum)
+   - `bar.close > session VWAP` (optional, controlled by `require_price_above_vwap_for_longs`)
+   - `bars_seen_today >= min_bars_before_signal`
+   - Current time is within `[earliest_entry_time, latest_entry_time]`
+4. Optionally enter SHORT on strongly negative first windows (`allow_shorts=True`).
+5. Exit on stop-loss, profit target, trailing stop, or square-off time.
+   Exit priority: stop-loss → target → trailing stop → square-off.
+
+**Current assumptions (v1):**
+- MARKET order entry (fills at bar close in the backtester — optimistic).
+- Session VWAP resets at the start of each trading day; typical price = (H+L+C)/3.
+- Trailing stop rises (LONG) or falls (SHORT) as the best price advances; never reverses.
+- RVOL / ATR filters are accepted in config but not enforced (no historical baseline
+  available inside the strategy); a one-time warning is logged per symbol per day.
+- State resets fully at the start of each new trading day.
+- Multiple symbols maintain fully independent state.
+
+**Key configuration (`FirstHourMomentumConfig`):**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `quantity` | 10 | Shares per signal |
+| `momentum_window_minutes` | 30 | Bars in the first observation window |
+| `earliest_entry_time` | 09:45 | No entries before this time |
+| `latest_entry_time` | 12:00 | No new entries at or after this time |
+| `square_off_time` | 15:15 | Force-close all positions at this time |
+| `min_first_window_return_bps` | 60.0 | Minimum window return for LONG (bps) |
+| `min_opening_range_bps` | 30.0 | Minimum window H-L range (bps) |
+| `max_opening_range_bps` | 250.0 | Maximum window H-L range (bps) |
+| `require_price_above_vwap_for_longs` | True | Entry bar close must be above session VWAP |
+| `allow_shorts` | False | Also consider SHORT on negative windows |
+| `stop_loss_bps` | 80.0 | Initial stop bps from entry price |
+| `trailing_stop_bps` | None | Trailing stop bps from best price (disabled if None) |
+| `target_bps` | None | Profit target bps from entry (disabled if None) |
+| `max_trades_per_symbol_per_day` | 1 | Maximum entries per symbol per day |
+| `min_bars_before_signal` | 30 | Minimum bars seen before any entry |
+
+```bash
+# Run First-Hour Momentum backtest on local Parquet candle data:
+python3 scripts/run_first_hour_momentum_backtest.py
+
+# Override window, threshold, shorts:
+python3 scripts/run_first_hour_momentum_backtest.py \
+  --symbols RELIANCE TCS \
+  --momentum-window-minutes 60 \
+  --min-first-window-return-bps 80 \
+  --allow-shorts
+
+# Run parameter sweep (324 combinations):
+python3 scripts/sweep_first_hour_momentum_params.py
+
+# Limit sweep to first 50 combinations:
+python3 scripts/sweep_first_hour_momentum_params.py --max-combinations 50
+
+# Sweep results saved to reports/first_hour_momentum_sweep_results.{csv,json}
+
+# Run strategy tests:
+python3 -m pytest tests/unit/strategies/test_first_hour_momentum.py \
+                  tests/unit/strategies/test_first_hour_momentum_backtest.py \
+                  tests/unit/scripts/test_first_hour_momentum_scripts.py -v
+```
+
+> **WARNING**: All sweep results are IN-SAMPLE only.  Never use them to size
+> or place live trades without rigorous out-of-sample validation.
+
+---
+
 **Milestone 7 — VWAP Trend Pullback Strategy** (complete)
 
 Added the VWAP Trend Pullback intraday long-only strategy in backtest-only mode.
