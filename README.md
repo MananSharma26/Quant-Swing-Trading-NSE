@@ -261,9 +261,18 @@ python3 scripts/run_vwap_backtest.py \
   --initial-cash 1000000 \
   --quantity 20
 
+# Run parameter sweep (243 combinations):
+python3 scripts/sweep_vwap_params.py
+
+# Limit sweep to first 50 combinations:
+python3 scripts/sweep_vwap_params.py --max-combinations 50
+
+# Sweep results saved to reports/vwap_sweep_results.{csv,json}
+
 # Run strategy tests:
 python3 -m pytest tests/unit/strategies/test_vwap_pullback.py \
-                  tests/unit/strategies/test_vwap_pullback_backtest.py -v
+                  tests/unit/strategies/test_vwap_pullback_backtest.py \
+                  tests/unit/scripts/test_sweep_vwap_params.py -v
 ```
 
 ---

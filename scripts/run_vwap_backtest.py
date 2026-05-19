@@ -126,12 +126,15 @@ def main(argv: list[str] | None = None) -> None:
     candles: dict[str, pd.DataFrame] = {}
     for symbol in args.symbols:
         path = data_dir / "candles" / "NSE" / symbol / f"{interval}.parquet"
-        if path.exists():
+        if not path.exists():
+            print(f"  [skip] No data file for {symbol} at {path}")
+            continue
+        try:
             df = pd.read_parquet(path)
             candles[symbol] = df
             print(f"  Loaded {symbol}: {len(df)} bars")
-        else:
-            print(f"  [skip] No data for {symbol} at {path}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"  [skip] Failed to read {symbol}: {exc}")
 
     if not candles:
         print(
