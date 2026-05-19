@@ -145,6 +145,91 @@ def _safe_float(value) -> float | None:
         return None
 
 
+_ZERO = Decimal("0")
+
+
+def _trade_level_metrics(fills: list) -> dict:
+    """Pair BUY/SELL fills with a correctly consumed FIFO buy queue.
+
+    ``metrics.py`` never pops entries from the buy queue, so
+    ``m.realized_pnl``, ``m.profit_factor``, ``m.average_trade_pnl``, and
+    ``m.win_rate`` are all wrong for multi-day runs where the same symbol
+    trades more than once.  This helper recomputes them correctly.
+
+    Gross P&L per trade = sell_revenue − buy_cost (before any fees).
+
+    Returns
+    -------
+    dict with:
+        round_trips       – number of completed sell fills
+        gross_pnl         – sum of gross per-trade P&L; None if 0 round-trips
+        profit_factor     – gross_wins / |gross_losses|; None if no losses or
+                            no round-trips (infinite or undefined)
+        win_count         – trades with gross_pnl > 0
+        loss_count        – trades with gross_pnl < 0
+        win_rate          – win_count / round_trips; None if 0 round-trips
+        average_gross_pnl – gross_pnl / round_trips; None if 0 round-trips
+    """
+    from trading_engine.domain.enums import Side  # noqa: PLC0415
+
+    buy_queue: dict[str, list[tuple[int, Decimal]]] = {}
+    gross_pnls: list[Decimal] = []
+
+    for fill in fills:
+        sym = fill.symbol
+        if fill.side == Side.BUY:
+            buy_queue.setdefault(sym, []).append((fill.quantity, fill.price))
+        elif fill.side == Side.SELL:
+            entries = buy_queue.get(sym, [])
+            remaining = fill.quantity
+            cost = _ZERO
+            new_entries: list[tuple[int, Decimal]] = []
+            for qty, price in entries:
+                if remaining <= 0:
+                    new_entries.append((qty, price))
+                    continue
+                used = min(qty, remaining)
+                cost += Decimal(str(used)) * price
+                remaining -= used
+                leftover = qty - used
+                if leftover > 0:
+                    new_entries.append((leftover, price))
+            buy_queue[sym] = new_entries  # consumed entries removed
+            gross_pnls.append(Decimal(str(fill.quantity)) * fill.price - cost)
+
+    n = len(gross_pnls)
+    if n == 0:
+        return {
+            "round_trips": 0,
+            "gross_pnl": None,
+            "profit_factor": None,
+            "win_count": 0,
+            "loss_count": 0,
+            "win_rate": None,
+            "average_gross_pnl": None,
+        }
+
+    wins = [p for p in gross_pnls if p > _ZERO]
+    losses = [p for p in gross_pnls if p < _ZERO]
+    total_gross = sum(gross_pnls, _ZERO)
+
+    pf: float | None = None
+    if losses:
+        gross_loss = abs(sum(losses, _ZERO))
+        if gross_loss > _ZERO:
+            pf = _safe_float(sum(wins, _ZERO) / gross_loss)
+
+    return {
+        "round_trips": n,
+        "gross_pnl": _safe_float(total_gross),
+        "profit_factor": pf,
+        "win_count": len(wins),
+        "loss_count": len(losses),
+        "win_rate": _safe_float(Decimal(str(len(wins))) / Decimal(str(n))),
+        "average_gross_pnl": _safe_float(total_gross / Decimal(str(n))),
+    }
+
+
 def _derive_config_times(momentum_window_minutes: int, latest_entry_time: time) -> tuple[time, int]:
     """Compute earliest_entry_time and min_bars_before_signal from window length."""
     session_minutes = 9 * 60 + 15 + momentum_window_minutes
@@ -186,6 +271,7 @@ def run_single(
         return {
             **_params_to_row(params),
             "error": str(exc),
+            "_consistency_warning": None,
             "total_return": None,
             "total_pnl": None,
             "gross_pnl": None,
@@ -218,18 +304,46 @@ def run_single(
 
     report = engine.run()
     m = report.metrics
+    tl = _trade_level_metrics(report.fills)
+
+    # ── Reliable formula: gross = net P&L + all fees ─────────────────────────
+    # Valid whenever all positions are closed at end of the run (intraday square-off).
+    # m.realized_pnl is NOT used: the metrics.py FIFO queue is never consumed,
+    # so realized_pnl is wrong for multi-day runs with more than one trade per symbol.
+    net_pnl = m.total_pnl
+    total_fees_val = m.total_fees
+    gross_pnl_formula = _safe_float(net_pnl + total_fees_val)
+
+    # ── Consistency check ─────────────────────────────────────────────────────
+    # If fills-derived gross disagrees with the formula by more than 1 INR,
+    # there are likely open positions at end of data.
+    consistency_warning: str | None = None
+    if tl["gross_pnl"] is not None and gross_pnl_formula is not None:
+        discrepancy = abs(gross_pnl_formula - tl["gross_pnl"])
+        if discrepancy > 1.0:
+            consistency_warning = (
+                f"gross_pnl mismatch: formula={gross_pnl_formula:.2f} "
+                f"fills={tl['gross_pnl']:.2f} diff={discrepancy:.2f} "
+                "(possible open position at end of data)"
+            )
+
+    # ── average_trade_pnl: net total P&L / completed round-trips ─────────────
+    avg_trade_pnl: float | None = None
+    if tl["round_trips"] > 0:
+        avg_trade_pnl = _safe_float(net_pnl / Decimal(str(tl["round_trips"])))
 
     row = _params_to_row(params)
     row["error"] = None
+    row["_consistency_warning"] = consistency_warning
     row["total_return"] = _safe_float(m.total_return)
-    row["total_pnl"] = _safe_float(m.total_pnl)
-    row["gross_pnl"] = _safe_float(m.realized_pnl)
-    row["total_fees"] = _safe_float(m.total_fees)
+    row["total_pnl"] = _safe_float(net_pnl)
+    row["gross_pnl"] = gross_pnl_formula  # total_pnl + total_fees
+    row["total_fees"] = _safe_float(total_fees_val)
     row["max_drawdown"] = _safe_float(m.max_drawdown)
-    row["win_rate"] = _safe_float(m.win_rate)
-    row["profit_factor"] = _safe_float(m.profit_factor)
+    row["win_rate"] = tl["win_rate"]  # from correct FIFO pairing
+    row["profit_factor"] = tl["profit_factor"]  # None when no losses (undefined)
     row["trade_count"] = m.trade_count
-    row["average_trade_pnl"] = _safe_float(m.average_trade_pnl)
+    row["average_trade_pnl"] = avg_trade_pnl  # net_pnl / round_trips
     row["sharpe_ratio"] = _safe_float(m.sharpe_ratio)
     row["sortino_ratio"] = _safe_float(m.sortino_ratio)
     return row

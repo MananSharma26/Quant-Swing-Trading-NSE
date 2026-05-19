@@ -197,6 +197,211 @@ class TestRunSingle:
 
 
 # ---------------------------------------------------------------------------
+# Tests: metrics correctness (gross_pnl, profit_factor, average_trade_pnl)
+# ---------------------------------------------------------------------------
+
+
+def _make_entry_exit_candles() -> dict[str, pd.DataFrame]:
+    """5 uptrend window bars + 1 entry bar + 1 stop-loss bar → 1 losing round-trip.
+
+    Window (09:15–09:19): closes 100..102 → fw_return=200bps > 100bps threshold.
+    Narrow bars (high=c+0.1, low=c-0.1) keep opening_range≈220bps within [30,250].
+    Entry bar (09:20):   close=102.5 > fw_close=102; VWAP≈101.25 < 102.5 → BUY.
+    Stop bar  (09:21):   stop=102.5*(1-0.01)=101.475; low=101.0 < 101.475 → SELL.
+    """
+    rows = []
+    for i in range(5):
+        c = 100.0 + i * 0.5
+        rows.append(
+            {
+                "timestamp": pd.Timestamp(f"2024-01-15 09:{15 + i:02d}:00"),
+                "open": c,
+                "high": c + 0.1,  # narrow bars: range ≈ 220bps < 250bps default max
+                "low": c - 0.1,
+                "close": c,
+                "volume": 1000,
+            }
+        )
+    rows.append(
+        {
+            "timestamp": pd.Timestamp("2024-01-15 09:20:00"),
+            "open": 102.0,
+            "high": 103.5,
+            "low": 101.5,
+            "close": 102.5,
+            "volume": 1000,
+        }
+    )
+    rows.append(
+        {
+            "timestamp": pd.Timestamp("2024-01-15 09:21:00"),
+            "open": 102.5,
+            "high": 103.0,
+            "low": 101.0,
+            "close": 101.5,
+            "volume": 1000,
+        }
+    )
+    return {"RELIANCE": pd.DataFrame(rows)}
+
+
+def _make_entry_profit_candles() -> dict[str, pd.DataFrame]:
+    """5 uptrend window bars + 1 entry bar + square-off bar → 1 winning round-trip.
+
+    Narrow bars keep opening_range≈220bps within [30,250].
+    The profitable square-off at 15:15 is the only exit; zero losses.
+    profit_factor is None (no losing trades → undefined / infinite).
+    """
+    rows = []
+    for i in range(5):
+        c = 100.0 + i * 0.5
+        rows.append(
+            {
+                "timestamp": pd.Timestamp(f"2024-01-15 09:{15 + i:02d}:00"),
+                "open": c,
+                "high": c + 0.1,
+                "low": c - 0.1,
+                "close": c,
+                "volume": 1000,
+            }
+        )
+    rows.append(
+        {
+            "timestamp": pd.Timestamp("2024-01-15 09:20:00"),
+            "open": 102.0,
+            "high": 103.5,
+            "low": 101.5,
+            "close": 102.5,
+            "volume": 1000,
+        }
+    )
+    # Square-off at 15:15: price well above entry → profitable trade.
+    rows.append(
+        {
+            "timestamp": pd.Timestamp("2024-01-15 15:15:00"),
+            "open": 107.0,
+            "high": 109.0,
+            "low": 106.0,
+            "close": 108.0,
+            "volume": 1000,
+        }
+    )
+    return {"RELIANCE": pd.DataFrame(rows)}
+
+
+def _sweep_params() -> dict:
+    return {
+        "momentum_window_minutes": 5,
+        "min_first_window_return_bps": 100.0,
+        "latest_entry_time": time(12, 0),
+        "stop_loss_bps": 100.0,
+        "target_bps": None,
+        "allow_shorts": False,
+        "max_trades_per_symbol_per_day": 1,
+    }
+
+
+class TestMetricsFix:
+    """Verify that gross_pnl, profit_factor, and average_trade_pnl are correct."""
+
+    def test_gross_pnl_equals_total_pnl_plus_total_fees(self):
+        """gross_pnl must equal total_pnl + total_fees for a completed round-trip."""
+        row = run_single(
+            _make_entry_exit_candles(), _sweep_params(), Decimal("100000"), 10, "minute"
+        )
+        assert row.get("error") is None
+        gp = row["gross_pnl"]
+        tp = row["total_pnl"]
+        tf = row["total_fees"]
+        assert gp is not None and tp is not None and tf is not None
+        assert abs(gp - (tp + tf)) < 1.0, (
+            f"gross_pnl={gp:.4f} != total_pnl+total_fees={tp + tf:.4f}"
+        )
+
+    def test_gross_pnl_formula_independent_of_realized_pnl(self):
+        """gross_pnl must not blindly copy m.realized_pnl (which has a FIFO bug).
+
+        For a single-symbol round-trip, realized_pnl deducts only sell fees,
+        so it differs from total_pnl + total_fees by the buy-side fees.
+        The new formula always satisfies the accounting identity exactly.
+        """
+        row = run_single(
+            _make_entry_exit_candles(), _sweep_params(), Decimal("100000"), 10, "minute"
+        )
+        assert row.get("error") is None
+        gp = row["gross_pnl"]
+        tp = row["total_pnl"]
+        tf = row["total_fees"]
+        # Accounting identity must hold within 1 INR rounding tolerance.
+        assert abs(gp - (tp + tf)) < 1.0
+
+    def test_profit_factor_none_when_no_round_trips(self):
+        """profit_factor is None when no completed trades exist."""
+        # Only 3 bars — window needs 5, so no entry, no fills.
+        row = run_single(_make_candles(n_bars=3), _sweep_params(), Decimal("100000"), 10, "minute")
+        assert row.get("error") is None
+        assert row["profit_factor"] is None
+
+    def test_profit_factor_none_when_all_trades_are_wins(self):
+        """profit_factor is None when there are wins but zero losing trades."""
+        row = run_single(
+            _make_entry_profit_candles(), _sweep_params(), Decimal("100000"), 10, "minute"
+        )
+        assert row.get("error") is None
+        # One profitable trade, zero losses → denominator=0 → profit_factor=None.
+        assert row["profit_factor"] is None
+
+    def test_average_trade_pnl_is_total_pnl_divided_by_one_round_trip(self):
+        """For a single round-trip, average_trade_pnl must equal total_pnl."""
+        row = run_single(
+            _make_entry_exit_candles(), _sweep_params(), Decimal("100000"), 10, "minute"
+        )
+        assert row.get("error") is None
+        tp = row["total_pnl"]
+        atp = row["average_trade_pnl"]
+        tc = row["trade_count"]
+        assert tp is not None and atp is not None
+        assert tc == 2, f"expected 2 fills (1 round-trip), got {tc}"
+        # 1 round-trip → average = total_pnl / 1 = total_pnl
+        assert abs(atp - tp) < 0.01, f"average_trade_pnl={atp} != total_pnl={tp}"
+
+    def test_no_consistency_warning_for_fully_closed_position(self):
+        """_consistency_warning must be None when all positions are squared off."""
+        row = run_single(
+            _make_entry_exit_candles(), _sweep_params(), Decimal("100000"), 10, "minute"
+        )
+        assert row.get("error") is None
+        assert row["_consistency_warning"] is None, row["_consistency_warning"]
+
+    def test_csv_gross_pnl_matches_total_pnl_plus_fees(self, tmp_path: Path):
+        """Saved CSV must have gross_pnl = total_pnl + total_fees."""
+        row = run_single(
+            _make_entry_exit_candles(), _sweep_params(), Decimal("100000"), 10, "minute"
+        )
+        csv_path, _ = save_results([row], tmp_path)
+        df = pd.read_csv(csv_path)
+        gp = float(df["gross_pnl"].iloc[0])
+        tp = float(df["total_pnl"].iloc[0])
+        tf = float(df["total_fees"].iloc[0])
+        assert abs(gp - (tp + tf)) < 1.0
+
+    def test_json_gross_pnl_matches_total_pnl_plus_fees(self, tmp_path: Path):
+        """Saved JSON must have gross_pnl = total_pnl + total_fees."""
+        row = run_single(
+            _make_entry_exit_candles(), _sweep_params(), Decimal("100000"), 10, "minute"
+        )
+        _, json_path = save_results([row], tmp_path)
+        with json_path.open() as fh:
+            data = json.load(fh)
+        rec = data[0]
+        gp = rec["gross_pnl"]
+        tp = rec["total_pnl"]
+        tf = rec["total_fees"]
+        assert gp is not None and tp is not None and tf is not None
+        assert abs(gp - (tp + tf)) < 1.0
+
+
+# ---------------------------------------------------------------------------
 # Tests: run_sweep
 # ---------------------------------------------------------------------------
 
