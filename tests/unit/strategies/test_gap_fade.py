@@ -333,3 +333,169 @@ class TestEntryLogic:
             _bar("2024-01-16 09:25:00", open_=99.0, high=99.5, low=98.9, close=99.2), ctx
         )
         assert intents2 == []
+
+
+class TestExitLogic:
+    def _strategy_with_long_position(self, **cfg_kwargs):
+        """Create a strategy pre-loaded with an open LONG position."""
+        import datetime as dt
+
+        from trading_engine.strategies.gap_fade import _SymbolState
+
+        s = GapFadeStrategy(_permissive_cfg(**cfg_kwargs))
+        state = _SymbolState()
+        state.current_date = dt.date(2024, 1, 16)
+        state.in_position = True
+        state.position_side = "LONG"
+        state.entry_price = Decimal("100")
+        state.stop_price = Decimal("98")
+        state.dynamic_target = None
+        state.vwap = Decimal("101")
+        state.opening_bar_seen = True
+        state.gap_qualified = True
+        state.prior_close = Decimal("98")
+        state.opening_price = Decimal("100")
+        state.trades_taken_today = 1
+        state.cumulative_pv = Decimal("100")
+        state.cumulative_vol = 1
+        s._states["TEST"] = state
+        return s
+
+    def _strategy_with_short_position(self, **cfg_kwargs):
+        """Create a strategy pre-loaded with an open SHORT position."""
+        import datetime as dt
+
+        from trading_engine.strategies.gap_fade import _SymbolState
+
+        s = GapFadeStrategy(_permissive_cfg(**cfg_kwargs))
+        state = _SymbolState()
+        state.current_date = dt.date(2024, 1, 16)
+        state.in_position = True
+        state.position_side = "SHORT"
+        state.entry_price = Decimal("100")
+        state.stop_price = Decimal("102")
+        state.dynamic_target = None
+        state.vwap = Decimal("99")
+        state.opening_bar_seen = True
+        state.gap_qualified = True
+        state.prior_close = Decimal("102")
+        state.opening_price = Decimal("100")
+        state.trades_taken_today = 1
+        state.cumulative_pv = Decimal("100")
+        state.cumulative_vol = 1
+        s._states["TEST"] = state
+        return s
+
+    def test_stop_loss_exits_long(self):
+        """bar.low <= stop_price -> SELL with reason gf_stop_loss."""
+        s = self._strategy_with_long_position()
+        ctx = _ctx()
+        # stop=98, bar.low=97 -> stop hit
+        intents = s.on_bar(
+            _bar("2024-01-16 09:25:00", open_=100.0, high=100.5, low=97.0, close=97.5), ctx
+        )
+        assert len(intents) == 1
+        assert intents[0].side == "SELL"
+        assert intents[0].reason == "gf_stop_loss"
+
+    def test_stop_loss_exits_short(self):
+        """bar.high >= stop_price -> BUY with reason gf_stop_loss."""
+        s = self._strategy_with_short_position()
+        ctx = _ctx()
+        # stop=102, bar.high=103 -> stop hit
+        intents = s.on_bar(
+            _bar("2024-01-16 09:25:00", open_=100.0, high=103.0, low=99.5, close=100.0), ctx
+        )
+        assert len(intents) == 1
+        assert intents[0].side == "BUY"
+        assert intents[0].reason == "gf_stop_loss"
+
+    def test_vwap_target_exits_long(self):
+        """target_mode=vwap: bar.high >= vwap -> exit with gf_target."""
+        s = self._strategy_with_long_position(target_mode="vwap")
+        state = s._states["TEST"]
+        state.vwap = Decimal("101")
+        state.dynamic_target = None  # vwap mode uses state.vwap each bar
+        ctx = _ctx()
+        # bar.high=101.5 >= vwap=101 -> target hit
+        intents = s.on_bar(
+            _bar("2024-01-16 09:25:00", open_=100.0, high=101.5, low=99.9, close=101.0), ctx
+        )
+        assert len(intents) == 1
+        assert intents[0].reason == "gf_target"
+
+    def test_prior_close_target_exits_long(self):
+        """target_mode=prior_close: bar.high >= dynamic_target -> exit."""
+        s = self._strategy_with_long_position(target_mode="prior_close")
+        state = s._states["TEST"]
+        state.dynamic_target = Decimal("102")
+        ctx = _ctx()
+        # bar.high=102.5 >= target=102 -> target hit
+        intents = s.on_bar(
+            _bar("2024-01-16 09:25:00", open_=100.0, high=102.5, low=99.9, close=102.0), ctx
+        )
+        assert len(intents) == 1
+        assert intents[0].reason == "gf_target"
+
+    def test_half_gap_target_exits_short(self):
+        """target_mode=half_gap: bar.low <= dynamic_target -> exit."""
+        s = self._strategy_with_short_position(target_mode="half_gap")
+        state = s._states["TEST"]
+        state.dynamic_target = Decimal("99")
+        ctx = _ctx()
+        # bar.low=98.5 <= target=99 -> target hit
+        intents = s.on_bar(
+            _bar("2024-01-16 09:25:00", open_=100.0, high=100.2, low=98.5, close=99.0), ctx
+        )
+        assert len(intents) == 1
+        assert intents[0].reason == "gf_target"
+
+    def test_square_off_exits_at_15_15(self):
+        """Bar at 15:15 triggers square-off regardless of P&L."""
+        s = self._strategy_with_long_position()
+        state = s._states["TEST"]
+        state.vwap = Decimal("105")  # VWAP high so target won't trigger
+        ctx = _ctx()
+        intents = s.on_bar(
+            _bar("2024-01-16 15:15:00", open_=100.0, high=100.1, low=99.9, close=100.0), ctx
+        )
+        assert len(intents) == 1
+        assert intents[0].reason == "gf_square_off"
+
+    def test_stop_loss_takes_priority_over_target(self):
+        """When stop and target both triggered on same bar, stop-loss wins."""
+        s = self._strategy_with_long_position(target_mode="prior_close")
+        state = s._states["TEST"]
+        state.stop_price = Decimal("98")  # bar.low=97 -> stop hit
+        state.dynamic_target = Decimal("102")  # bar.high=103 -> target hit too
+        ctx = _ctx()
+        intents = s.on_bar(
+            _bar("2024-01-16 09:30:00", open_=100.0, high=103.0, low=97.0, close=100.0), ctx
+        )
+        assert len(intents) == 1
+        assert intents[0].reason == "gf_stop_loss"
+
+    def test_position_cleared_after_exit(self):
+        """After an exit intent, in_position must be False."""
+        s = self._strategy_with_long_position()
+        ctx = _ctx()
+        # stop=98, bar.low=97 -> stop hit, position should clear
+        s.on_bar(_bar("2024-01-16 09:25:00", open_=100.0, high=100.1, low=97.0, close=97.5), ctx)
+        assert s._states["TEST"].in_position is False
+
+    def test_vwap_target_not_triggered_when_bar_high_below_vwap(self):
+        """VWAP target requires bar.high >= vwap; if not met, no exit."""
+        s = self._strategy_with_long_position(target_mode="vwap")
+        state = s._states["TEST"]
+        # Set cumulative_pv/vol so VWAP stays well above 100.5 even after one more bar.
+        # New bar: TP = (100.5+99.9+100.0)/3 ≈ 100.13, volume=1000.
+        # With pv=105*10000=1050000, vol=10000: after bar VWAP ≈ (1050000+100133)/11000 ≈ 104.6
+        state.cumulative_pv = Decimal("1050000")
+        state.cumulative_vol = 10000
+        state.vwap = Decimal("105")
+        ctx = _ctx()
+        # bar.high=100.5 < vwap≈104.6 after update -> no target, no stop (low=99.9 > stop=98)
+        intents = s.on_bar(
+            _bar("2024-01-16 09:25:00", open_=100.0, high=100.5, low=99.9, close=100.0), ctx
+        )
+        assert intents == []
