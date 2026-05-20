@@ -1441,5 +1441,68 @@ decide whether an order can be placed. Strategies never touch the broker.
 
 ---
 
+## Gap Fade to VWAP / Prior Close Strategy
+
+### Why a new strategy?
+
+Extended validation of First-Hour Momentum (FHM) on ICICIBANK and TCS showed:
+- **Insufficient evidence**: only 32 trades over the full period for the best ICICIBANK config — far below the 100-trade threshold needed for statistical confidence.
+- **Slippage sensitivity**: the ICICIBANK base config produced +4.6 INR net at 2 bps slippage, turning negative at +1 tick (+3 bps) — unusable in practice.
+- **Conclusion**: FHM requires stronger market structure (higher RVOL, more trend days) than the available data exhibits.
+
+**Gap Fade** takes the opposite approach: mean reversion. When a stock opens with a significant gap (60–300 bps) from the previous close, it tends to partially retrace. The strategy fades the gap — entering long on gap-downs or short on gap-ups — and exits when price reaches the session VWAP, the prior close, or the half-gap level.
+
+### Strategy overview
+
+1. **Prior close tracking**: the previous day's last bar close is carried as `prior_close`.
+2. **Gap detection**: `gap_bps = (opening_price / prior_close − 1) × 10000`. First day always skipped.
+3. **Qualifying gap**: `min_gap_bps (60) ≤ |gap_bps| ≤ max_gap_bps (300)`.
+4. **Fade trigger**: price must reverse `fade_trigger_bps (20)` from opening_price before entry.
+5. **Optional VWAP confirmation**: long fades require `close > VWAP`; short fades require `close < VWAP`.
+6. **Exits**: stop-loss (80 bps), dynamic target (VWAP cross / prior close touch / half-gap), or square-off at 15:15.
+
+### Running the backtest
+
+```bash
+# Default 10 symbols, vwap target mode
+python3 scripts/run_gap_fade_backtest.py
+
+# Custom configuration
+python3 scripts/run_gap_fade_backtest.py \
+    --symbols RELIANCE TCS INFY \
+    --min-gap-bps 80 \
+    --max-gap-bps 400 \
+    --target-mode prior_close \
+    --stop-loss-bps 100 \
+    --output reports/my_gap_fade.json
+```
+
+### Running the parameter sweep
+
+```bash
+# Full sweep (324 combinations × 10 symbols)
+python3 scripts/sweep_gap_fade_params.py
+
+# Fast mode: 3 symbols × 50 combinations for quick exploration
+python3 scripts/sweep_gap_fade_params.py --fast --max-combinations 50
+
+# Custom output directory
+python3 scripts/sweep_gap_fade_params.py --output-dir /tmp/sweep_results
+```
+
+Sweep results are saved to `reports/gap_fade_sweep_results.csv` and `.json`. The top-10 combinations by total P&L are printed to stdout.
+
+### Sweep grid
+
+| Parameter | Values |
+|-----------|--------|
+| `min_gap_bps` | 40, 60, 80, 120 |
+| `max_gap_bps` | 200, 300, 500 |
+| `fade_trigger_bps` | 10, 20, 40 |
+| `stop_loss_bps` | 60, 80, 120 |
+| `target_mode` | vwap, prior_close, half_gap |
+
+---
+
 *This is not financial advice. The purpose of this project is to build a
 safer, testable, auditable trading software system.*
