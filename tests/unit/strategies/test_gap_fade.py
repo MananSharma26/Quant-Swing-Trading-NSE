@@ -231,3 +231,105 @@ class TestGapDetection:
         strategy.on_bar(_bar("2024-01-15 09:15:00", close=100.0), ctx)
         strategy.on_bar(_bar("2024-01-16 09:15:00", open_=101.0, close=101.0, volume=100), ctx)
         assert strategy._states["TEST"].gap_qualified is False
+
+
+def _feed_two_days_opening(
+    strategy,
+    ctx,
+    day1_close: float = 100.0,
+    day2_open: float = 101.0,
+) -> None:
+    """Feed day-1 close bar, then day-2 opening bar."""
+    strategy.on_bar(_bar("2024-01-15 09:15:00", close=day1_close), ctx)
+    strategy.on_bar(_bar("2024-01-16 09:15:00", open_=day2_open, close=day2_open), ctx)
+
+
+class TestEntryLogic:
+    def test_long_entry_emitted_when_fade_trigger_met(self):
+        """Gap-down + price rises fade_trigger_bps -> BUY intent returned."""
+        # Day 1 close=100, Day 2 open=99 (100 bps gap-down -> LONG fade)
+        # fade_trigger_bps=10 -> entry when close >= 99 * 1.001 = 99.099
+        strategy = GapFadeStrategy(_permissive_cfg(fade_trigger_bps=10.0))
+        ctx = _ctx()
+        _feed_two_days_opening(strategy, ctx, day1_close=100.0, day2_open=99.0)
+        # Entry bar: close=99.2 > trigger=99.099, vwap irrelevant (require=False)
+        intents = strategy.on_bar(
+            _bar("2024-01-16 09:20:00", open_=99.0, high=99.5, low=98.9, close=99.2), ctx
+        )
+        assert len(intents) == 1
+        assert intents[0].side == "BUY"
+        assert intents[0].reason == "gf_long_entry"
+
+    def test_short_entry_emitted_when_fade_trigger_met(self):
+        """Gap-up + price drops fade_trigger_bps -> SELL intent returned."""
+        # Day 1 close=100, Day 2 open=101 (100 bps gap-up -> SHORT fade)
+        # fade_trigger_bps=10 -> entry when close <= 101 * (1 - 0.001) = 100.899
+        strategy = GapFadeStrategy(_permissive_cfg(fade_trigger_bps=10.0))
+        ctx = _ctx()
+        _feed_two_days_opening(strategy, ctx, day1_close=100.0, day2_open=101.0)
+        # Entry bar: close=100.8 < trigger=100.899
+        intents = strategy.on_bar(
+            _bar("2024-01-16 09:20:00", open_=101.0, high=101.2, low=100.7, close=100.8), ctx
+        )
+        assert len(intents) == 1
+        assert intents[0].side == "SELL"
+        assert intents[0].reason == "gf_short_entry"
+
+    def test_no_entry_before_entry_start_time(self):
+        """Bars before entry_start_time=09:20 must not trigger entry."""
+        strategy = GapFadeStrategy(_permissive_cfg(fade_trigger_bps=5.0))
+        ctx = _ctx()
+        _feed_two_days_opening(strategy, ctx, day1_close=100.0, day2_open=99.0)
+        # 09:16 bar: trigger met but time < 09:20
+        intents = strategy.on_bar(
+            _bar("2024-01-16 09:16:00", open_=99.0, high=99.5, low=98.9, close=99.5), ctx
+        )
+        assert intents == []
+
+    def test_no_entry_after_latest_entry_time(self):
+        """Bars after latest_entry_time=10:30 must not trigger entry."""
+        strategy = GapFadeStrategy(_permissive_cfg(fade_trigger_bps=5.0))
+        ctx = _ctx()
+        _feed_two_days_opening(strategy, ctx, day1_close=100.0, day2_open=99.0)
+        intents = strategy.on_bar(
+            _bar("2024-01-16 10:31:00", open_=99.0, high=99.5, low=98.9, close=99.5), ctx
+        )
+        assert intents == []
+
+    def test_vwap_confirmation_blocks_long_entry_below_vwap(self):
+        """Long fade with require_vwap_confirmation=True: close must be > VWAP."""
+        # Strategy with VWAP confirmation on
+        strategy = GapFadeStrategy(
+            _permissive_cfg(fade_trigger_bps=1.0, require_vwap_confirmation=True)
+        )
+        ctx = _ctx()
+        # Day 1 close=200, day 2 open=99 (huge gap down -> LONG fade qualified)
+        strategy.on_bar(_bar("2024-01-15 09:15:00", close=200.0, volume=10000), ctx)
+        # Day 2 opening bar at 99, but supply a very high close to push VWAP up
+        strategy.on_bar(_bar("2024-01-16 09:15:00", open_=99.0, close=200.0, volume=10000), ctx)
+        # At 09:20: close=99.5 (above trigger 99*1.001=99.099) but VWAP is ~200
+        intents = strategy.on_bar(
+            _bar("2024-01-16 09:20:00", open_=99.5, high=100.0, low=99.4, close=99.5), ctx
+        )
+        assert intents == []  # blocked by VWAP confirmation
+
+    def test_max_trades_per_day_limit_respected(self):
+        """After one trade is entered, second entry is blocked."""
+        strategy = GapFadeStrategy(
+            _permissive_cfg(fade_trigger_bps=10.0, max_trades_per_symbol_per_day=1)
+        )
+        ctx = _ctx()
+        _feed_two_days_opening(strategy, ctx, day1_close=100.0, day2_open=99.0)
+        # First entry
+        intents1 = strategy.on_bar(
+            _bar("2024-01-16 09:20:00", open_=99.0, high=99.5, low=98.9, close=99.2), ctx
+        )
+        assert len(intents1) == 1
+        # Manually clear position to test trade counter
+        strategy._states["TEST"].in_position = False
+        strategy._states["TEST"].position_side = ""
+        # Second entry attempt -- trade count already = 1
+        intents2 = strategy.on_bar(
+            _bar("2024-01-16 09:25:00", open_=99.0, high=99.5, low=98.9, close=99.2), ctx
+        )
+        assert intents2 == []
