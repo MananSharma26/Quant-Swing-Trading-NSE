@@ -129,10 +129,52 @@ class TestPortfolioSell:
         with pytest.raises(InsufficientPositionError):
             p.apply_fill(_make_fill(side=Side.SELL, quantity=10, fees=Decimal("0")))
 
-    def test_cannot_sell_with_no_position(self) -> None:
+    def test_sell_with_no_position_opens_short(self) -> None:
         p = _portfolio()
-        with pytest.raises(InsufficientPositionError):
-            p.apply_fill(_make_fill(side=Side.SELL, quantity=1, fees=Decimal("0")))
+        p.apply_fill(_make_fill(side=Side.SELL, quantity=1, price=Decimal("100"), fees=Decimal("0")))
+        pos = p.get_position("RELIANCE")
+        assert pos.quantity == -1
+
+
+class TestShortSelling:
+    def test_short_entry_increases_cash(self) -> None:
+        p = _portfolio(Decimal("100000"))
+        p.apply_fill(_make_fill(side=Side.SELL, quantity=10, price=Decimal("100"), fees=Decimal("0")))
+        assert p.cash == Decimal("101000")  # 100000 + 10*100
+
+    def test_short_entry_sets_negative_quantity(self) -> None:
+        p = _portfolio()
+        p.apply_fill(_make_fill(side=Side.SELL, quantity=10, price=Decimal("100"), fees=Decimal("0")))
+        assert p.get_position("RELIANCE").quantity == -10
+
+    def test_short_cover_books_profit(self) -> None:
+        p = _portfolio(Decimal("100000"))
+        p.apply_fill(_make_fill(side=Side.SELL, quantity=10, price=Decimal("100"), fees=Decimal("0")))
+        p.apply_fill(_make_fill(side=Side.BUY, quantity=10, price=Decimal("90"), fees=Decimal("0")))
+        pos = p.get_position("RELIANCE")
+        assert pos.quantity == 0
+        assert pos.realized_pnl == Decimal("100")  # (100-90)*10
+
+    def test_short_cover_books_loss(self) -> None:
+        p = _portfolio(Decimal("100000"))
+        p.apply_fill(_make_fill(side=Side.SELL, quantity=10, price=Decimal("100"), fees=Decimal("0")))
+        p.apply_fill(_make_fill(side=Side.BUY, quantity=10, price=Decimal("110"), fees=Decimal("0")))
+        pos = p.get_position("RELIANCE")
+        assert pos.realized_pnl == Decimal("-100")  # (100-110)*10
+
+    def test_short_cover_cash_settles_correctly(self) -> None:
+        p = _portfolio(Decimal("100000"))
+        p.apply_fill(_make_fill(side=Side.SELL, quantity=10, price=Decimal("100"), fees=Decimal("0")))
+        p.apply_fill(_make_fill(side=Side.BUY, quantity=10, price=Decimal("90"), fees=Decimal("0")))
+        # Started 100000, received 1000 on short, paid 900 on cover → 100100
+        assert p.cash == Decimal("100100")
+
+    def test_total_equity_includes_short_liability(self) -> None:
+        p = _portfolio(Decimal("100000"))
+        p.apply_fill(_make_fill(side=Side.SELL, quantity=10, price=Decimal("100"), fees=Decimal("0")))
+        # cash=101000, short 10 @ 100, current price=105 → equity=101000 + (-10)*105=100000-50=99950
+        equity = p.total_equity({"RELIANCE": Decimal("105")})
+        assert equity == Decimal("99950")
 
 
 class TestPortfolioMarkToMarket:

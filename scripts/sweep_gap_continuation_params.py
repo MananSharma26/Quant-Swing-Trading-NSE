@@ -115,6 +115,8 @@ def run_single(
     run_index: int = 0,
 ) -> dict:
     """Run one backtest with the given params; return a result row dict."""
+    allow_long = params.get("allow_long_continuations", True)
+    allow_short = params.get("allow_short_continuations", True)
     try:
         cfg = GapContinuationConfig(
             strategy_id=f"gc_sweep_{run_index}",
@@ -123,6 +125,8 @@ def run_single(
             max_gap_bps=float(params["max_gap_bps"]),
             continuation_trigger_bps=float(params["continuation_trigger_bps"]),
             stop_loss_bps=float(params["stop_loss_bps"]),
+            allow_long_continuations=allow_long,
+            allow_short_continuations=allow_short,
         )
     except ValueError as exc:
         return {**params, "error": str(exc), "total_pnl": None, "trade_count": None}
@@ -171,6 +175,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="Fast mode: 3 symbols, up to 30 combinations")
     parser.add_argument("--max-combinations", dest="max_combinations", type=int, default=None)
     parser.add_argument("--output-dir", dest="output_dir", default=str(_DEFAULT_OUTPUT_DIR))
+    parser.add_argument("--long-only", dest="long_only", action="store_true", default=False,
+                        help="Only take gap-up LONG continuations")
+    parser.add_argument("--short-only", dest="short_only", action="store_true", default=False,
+                        help="Only take gap-down SHORT continuations")
     return parser.parse_args(argv)
 
 
@@ -201,7 +209,12 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(0)
 
     combos = build_grid(max_combinations=max_combinations)
+    # Inject direction flags into each combo
+    for c in combos:
+        c["allow_long_continuations"] = not args.short_only
+        c["allow_short_continuations"] = not args.long_only
     print(f"\nRunning {len(combos)} combinations on {list(candles.keys())} ...")
+    print(f"  Long-only: {args.long_only}  Short-only: {args.short_only}")
 
     results = []
     for i, params in enumerate(combos):

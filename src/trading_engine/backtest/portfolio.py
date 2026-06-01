@@ -1,7 +1,9 @@
 """Backtest portfolio tracker.
 
 Tracks cash, positions, realized/unrealized P&L, and equity over time.
-Long-only in v1: a SELL that would take a position negative is rejected.
+Supports both long and short positions. A SELL on a flat/short position opens
+or adds to a short. A BUY on a short position covers it.
+Selling more than a current long position is rejected (close long first).
 """
 
 from __future__ import annotations
@@ -15,12 +17,12 @@ from trading_engine.domain.models import PortfolioSnapshot, Position, TradeFill
 
 
 class InsufficientPositionError(Exception):
-    """Raised when a SELL would exceed the current long position."""
+    """Raised when a SELL quantity exceeds the current long position."""
 
 
 @dataclass
 class _PositionState:
-    """Mutable internal position state."""
+    """Mutable internal position state. quantity < 0 means short."""
 
     symbol: str
     exchange: Exchange
@@ -92,11 +94,11 @@ class BacktestPortfolio:
         return self._total_fees
 
     def total_equity(self, latest_prices: dict[str, Decimal] | None = None) -> Decimal:
-        """Cash + market value of all open positions."""
+        """Cash + market value of all open positions (long adds, short subtracts)."""
         prices = latest_prices or {}
         equity = self._cash
         for sym, pos in self._positions.items():
-            if pos.quantity > 0:
+            if pos.quantity != 0:
                 price = prices.get(sym, pos.average_price)
                 equity += Decimal(str(pos.quantity)) * price
         return equity
@@ -107,8 +109,10 @@ class BacktestPortfolio:
     def apply_fill(self, fill: TradeFill) -> None:
         """Update cash and position state from a trade fill.
 
-        For BUY: increases position, reduces cash (including fees).
-        For SELL: reduces position, increases cash, books realized P&L.
+        BUY on flat/long: opens or adds to long position.
+        BUY on short: covers the short, books realized P&L.
+        SELL on flat/short: opens or adds to short position.
+        SELL on long: closes or reduces long, books realized P&L.
 
         Raises:
             InsufficientPositionError: If SELL quantity > current long position.
@@ -117,36 +121,62 @@ class BacktestPortfolio:
         qty = Decimal(str(fill.quantity))
         gross_value = qty * fill.price
 
+        pos = self._positions.setdefault(
+            symbol,
+            _PositionState(
+                symbol=symbol,
+                exchange=fill.exchange,
+                product=self._product,
+                updated_at=fill.timestamp,
+            ),
+        )
+
         if fill.side == Side.BUY:
-            self._cash -= gross_value + fill.fees
-            pos = self._positions.setdefault(
-                symbol,
-                _PositionState(
-                    symbol=symbol,
-                    exchange=fill.exchange,
-                    product=self._product,
-                    updated_at=fill.timestamp,
-                ),
-            )
-            # Update average price (weighted average).
-            existing_value = Decimal(str(pos.quantity)) * pos.average_price
-            pos.quantity += fill.quantity
-            pos.average_price = (existing_value + gross_value) / Decimal(str(pos.quantity))
+            if pos.quantity < 0:
+                # Covering a short position.
+                cover_qty = Decimal(str(min(fill.quantity, -pos.quantity)))
+                realized = cover_qty * pos.average_price - cover_qty * fill.price - fill.fees
+                pos.realized_pnl += realized
+                pos.quantity += fill.quantity
+                self._cash -= gross_value + fill.fees
+                if pos.quantity > 0:
+                    # Went net long after cover — new long entered at fill price.
+                    pos.average_price = fill.price
+                elif pos.quantity == 0:
+                    pos.average_price = Decimal("0")
+            else:
+                # Opening or adding to a long position.
+                existing_value = Decimal(str(pos.quantity)) * pos.average_price
+                self._cash -= gross_value + fill.fees
+                pos.quantity += fill.quantity
+                pos.average_price = (existing_value + gross_value) / Decimal(str(pos.quantity))
             pos.updated_at = fill.timestamp
 
         elif fill.side == Side.SELL:
-            pos = self._positions.get(symbol)
-            current_qty = pos.quantity if pos else 0
-            if current_qty < fill.quantity:
-                raise InsufficientPositionError(
-                    f"Cannot sell {fill.quantity} of {symbol}: only {current_qty} held."
+            if pos.quantity > 0:
+                # Reducing or closing a long position.
+                if pos.quantity < fill.quantity:
+                    raise InsufficientPositionError(
+                        f"Cannot sell {fill.quantity} of {symbol}: only {pos.quantity} held long. "
+                        "Close long before going short."
+                    )
+                cost_basis = qty * pos.average_price
+                realized = gross_value - cost_basis - fill.fees
+                pos.realized_pnl += realized
+                pos.quantity -= fill.quantity
+                if pos.quantity == 0:
+                    pos.average_price = Decimal("0")
+                self._cash += gross_value - fill.fees
+            else:
+                # Opening or adding to a short position (pos.quantity <= 0).
+                existing_short = Decimal(str(-pos.quantity))
+                new_short_total = existing_short + qty
+                pos.average_price = (
+                    (existing_short * pos.average_price + gross_value) / new_short_total
                 )
-            cost_basis = Decimal(str(fill.quantity)) * pos.average_price
-            realized = gross_value - cost_basis - fill.fees
-            pos.realized_pnl += realized
-            pos.quantity -= fill.quantity
+                pos.quantity -= fill.quantity
+                self._cash += gross_value - fill.fees
             pos.updated_at = fill.timestamp
-            self._cash += gross_value - fill.fees
 
         self._total_fees += fill.fees
         self._fills.append(fill)
@@ -154,9 +184,10 @@ class BacktestPortfolio:
     def mark_to_market(self, timestamp: datetime, latest_prices: dict[str, Decimal]) -> None:
         """Update unrealized P&L and record equity curve point."""
         for sym, pos in self._positions.items():
-            if pos.quantity > 0 and sym in latest_prices:
+            if pos.quantity != 0 and sym in latest_prices:
                 price = latest_prices[sym]
                 pos.last_price = price
+                # qty*(price - avg) works for both long (qty>0) and short (qty<0).
                 pos.unrealized_pnl = (
                     Decimal(str(pos.quantity)) * price
                     - Decimal(str(pos.quantity)) * pos.average_price
@@ -169,11 +200,19 @@ class BacktestPortfolio:
         positions = [p.to_position() for p in self._positions.values()]
         realized = sum((p.realized_pnl for p in self._positions.values()), Decimal("0"))
         unrealized = sum((p.unrealized_pnl for p in self._positions.values()), Decimal("0"))
-        gross_exposure = sum(
+        long_exposure = sum(
             (
                 Decimal(str(p.quantity)) * (p.last_price or p.average_price)
                 for p in self._positions.values()
                 if p.quantity > 0
+            ),
+            Decimal("0"),
+        )
+        short_exposure = sum(
+            (
+                Decimal(str(-p.quantity)) * (p.last_price or p.average_price)
+                for p in self._positions.values()
+                if p.quantity < 0
             ),
             Decimal("0"),
         )
@@ -183,6 +222,6 @@ class BacktestPortfolio:
             positions=positions,
             realized_pnl=realized,
             unrealized_pnl=unrealized,
-            gross_exposure=gross_exposure,
-            net_exposure=gross_exposure,  # Long-only: net == gross
+            gross_exposure=long_exposure + short_exposure,
+            net_exposure=long_exposure - short_exposure,
         )

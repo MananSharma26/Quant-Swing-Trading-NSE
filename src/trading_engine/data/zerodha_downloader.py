@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+import time
 
 import pandas as pd
 
@@ -142,7 +143,7 @@ class DownloadResult:
         if self.chunks:
             print(f"  Chunks:          {len(self.chunks)}")
             for i, (c_from, c_to) in enumerate(self.chunks, 1):
-                print(f"    {i}: {c_from.date()} → {c_to.date()}")
+                print(f"    {i}: {c_from.date()} -> {c_to.date()}")
         if self.file_paths:
             print("  Saved files:")
             for sym, path in self.file_paths.items():
@@ -280,7 +281,7 @@ def run_download(
             len(chunks),
         )
         for i, (c_from, c_to) in enumerate(chunks, 1):
-            log.info("[DRY RUN] Chunk %d: %s → %s", i, c_from.date(), c_to.date())
+            log.info("[DRY RUN] Chunk %d: %s -> %s", i, c_from.date(), c_to.date())
         return DownloadResult(
             symbols_requested=target,
             symbols_downloaded=[],
@@ -312,6 +313,7 @@ def run_download(
             # Download all chunks without saving intermediate results.
             chunk_dfs: list[pd.DataFrame] = []
             for chunk_from, chunk_to in chunks:
+                time.sleep(0.4)  # Respect Zerodha 3 req/sec limit
                 df_chunk, _ = downloader.download(
                     instrument_token=token_map[symbol],
                     symbol=symbol,

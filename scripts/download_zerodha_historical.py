@@ -228,7 +228,7 @@ def main(argv: list[str] | None = None) -> int:
             chunks = split_date_range(from_date, to_date, args.chunk_days)
             print(f"  Chunks:     {len(chunks)}")
             for i, (c_from, c_to) in enumerate(chunks, 1):
-                print(f"    {i}: {c_from.date()} → {c_to.date()}")
+                print(f"    {i}: {c_from.date()} -> {c_to.date()}")
         result = run_download(config, broker=None)
         result.print_summary()
         return 0

@@ -26,6 +26,7 @@ from typing import Any
 from trading_engine.dashboard.session_writer import DashboardSessionWriter
 from trading_engine.live_data.candle_builder import CandleBuilder
 from trading_engine.live_data.models import LiveTick
+from trading_engine.notifications.telegram import TelegramNotifier
 from trading_engine.paper.broker import PaperExecutionBroker
 from trading_engine.paper.portfolio import PaperPortfolio
 from trading_engine.risk.engine import RiskEngine
@@ -78,6 +79,7 @@ class PaperLiveRunner:
         portfolio: PaperPortfolio,
         risk_engine: RiskEngine | None = None,
         dashboard_writer: DashboardSessionWriter | None = None,
+        notifier: TelegramNotifier | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         self._config = config
@@ -87,6 +89,7 @@ class PaperLiveRunner:
         self._portfolio = portfolio
         self._risk_engine = risk_engine
         self._dashboard_writer = dashboard_writer
+        self._notifier = notifier
         self._logger = logger or logging.getLogger(__name__)
 
         self._context = StrategyContext(
@@ -114,6 +117,12 @@ class PaperLiveRunner:
                 self._config.strategy_id,
                 self._config.symbols,
             )
+            if self._notifier:
+                self._notifier.notify_session_start(
+                    self._config.strategy_id,
+                    self._config.symbols,
+                    self._config.initial_cash,
+                )
 
     def stop(self) -> None:
         """Signal the runner to stop and flush incomplete candles."""
@@ -124,6 +133,14 @@ class PaperLiveRunner:
             "PaperLiveRunner stopped — fills=%d",
             len(self._fills),
         )
+        if self._notifier:
+            final_equity = self._portfolio.total_equity(self._latest_prices)
+            self._notifier.notify_session_end(
+                self._config.strategy_id,
+                len(self._fills),
+                final_equity,
+                self._config.initial_cash,
+            )
 
     def on_tick(self, tick: LiveTick) -> None:
         """Process a single live tick.
@@ -177,6 +194,8 @@ class PaperLiveRunner:
 
             if fill is not None:
                 self._fills.append(fill)
+                if self._notifier:
+                    self._notifier.notify_fill(fill)
 
         self._portfolio.mark_to_market(ts, self._latest_prices)
         self._write_dashboard()

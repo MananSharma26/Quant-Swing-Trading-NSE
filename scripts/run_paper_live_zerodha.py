@@ -39,6 +39,7 @@ from trading_engine.common.config import load_settings  # noqa: E402
 from trading_engine.dashboard.session_writer import DashboardSessionWriter  # noqa: E402
 from trading_engine.live_data.candle_builder import CandleBuilder  # noqa: E402
 from trading_engine.live_data.zerodha_feed import ZerodhaLiveMarketFeed  # noqa: E402
+from trading_engine.notifications.telegram import TelegramNotifier  # noqa: E402
 from trading_engine.paper.broker import PaperExecutionBroker  # noqa: E402
 from trading_engine.paper.live_runner import PaperLiveRunner, PaperLiveRunnerConfig  # noqa: E402
 from trading_engine.paper.portfolio import PaperPortfolio  # noqa: E402
@@ -79,9 +80,56 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--strategy",
-        choices=["orb"],
+        choices=["orb", "gap_continuation"],
         default="orb",
         help="Strategy to run (default: orb)",
+    )
+    parser.add_argument(
+        "--gc-quantity",
+        type=int,
+        default=50,
+        metavar="N",
+        help="[gap_continuation] Shares per trade (default: 50)",
+    )
+    parser.add_argument(
+        "--gc-min-gap-bps",
+        type=float,
+        default=120.0,
+        metavar="BPS",
+        help="[gap_continuation] Minimum gap size in bps (default: 120)",
+    )
+    parser.add_argument(
+        "--gc-max-gap-bps",
+        type=float,
+        default=500.0,
+        metavar="BPS",
+        help="[gap_continuation] Maximum gap size in bps (default: 500)",
+    )
+    parser.add_argument(
+        "--gc-trigger-bps",
+        type=float,
+        default=40.0,
+        metavar="BPS",
+        help="[gap_continuation] Continuation trigger in bps (default: 40)",
+    )
+    parser.add_argument(
+        "--gc-stop-bps",
+        type=float,
+        default=120.0,
+        metavar="BPS",
+        help="[gap_continuation] Stop-loss in bps (default: 120)",
+    )
+    parser.add_argument(
+        "--gc-long-only",
+        action="store_true",
+        default=False,
+        help="[gap_continuation] Only take gap-up LONG continuations",
+    )
+    parser.add_argument(
+        "--gc-short-only",
+        action="store_true",
+        default=False,
+        help="[gap_continuation] Only take gap-down SHORT continuations",
     )
     parser.add_argument(
         "--dashboard-path",
@@ -96,10 +144,22 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         metavar="AMOUNT",
         help="Starting portfolio cash (default: 100000)",
     )
+    parser.add_argument(
+        "--telegram-token",
+        default=None,
+        metavar="TOKEN",
+        help="Telegram bot token from @BotFather (optional)",
+    )
+    parser.add_argument(
+        "--telegram-chat-id",
+        default=None,
+        metavar="CHAT_ID",
+        help="Your Telegram chat ID (optional)",
+    )
     return parser.parse_args(argv)
 
 
-def _build_strategy(name: str, symbols: list[str]) -> object:
+def _build_strategy(name: str, symbols: list[str], args: argparse.Namespace) -> object:
     """Build the strategy object by name."""
     if name == "orb":
         from trading_engine.strategies.orb import (  # noqa: E402
@@ -112,6 +172,27 @@ def _build_strategy(name: str, symbols: list[str]) -> object:
             quantity=1,
         )
         return OpeningRangeBreakoutStrategy(config=config)
+
+    if name == "gap_continuation":
+        from trading_engine.strategies.gap_continuation import (  # noqa: E402
+            GapContinuationConfig,
+            GapContinuationStrategy,
+        )
+
+        allow_long = not args.gc_short_only
+        allow_short = not args.gc_long_only
+        config = GapContinuationConfig(
+            strategy_id="gc_paper_live",
+            quantity=args.gc_quantity,
+            min_gap_bps=args.gc_min_gap_bps,
+            max_gap_bps=args.gc_max_gap_bps,
+            continuation_trigger_bps=args.gc_trigger_bps,
+            stop_loss_bps=args.gc_stop_bps,
+            allow_long_continuations=allow_long,
+            allow_short_continuations=allow_short,
+        )
+        return GapContinuationStrategy(config=config)
+
     raise ValueError(f"Unknown strategy: {name!r}")
 
 
@@ -231,11 +312,21 @@ def main(argv: list[str] | None = None) -> int:
     portfolio = PaperPortfolio(initial_cash=initial_cash)
     broker = PaperExecutionBroker(portfolio=portfolio, cost_model=cost, slippage_model=slippage)
 
-    strategy = _build_strategy(args.strategy, symbols)
+    strategy = _build_strategy(args.strategy, symbols, args)
 
     dashboard_writer: DashboardSessionWriter | None = None
     if args.dashboard_path:
         dashboard_writer = DashboardSessionWriter(output_path=args.dashboard_path)
+
+    notifier: TelegramNotifier | None = None
+    if args.telegram_token and args.telegram_chat_id:
+        notifier = TelegramNotifier(
+            bot_token=args.telegram_token,
+            chat_id=args.telegram_chat_id,
+        )
+        print(f"[Paper Live] Telegram notifications enabled (chat_id={args.telegram_chat_id})")
+    else:
+        print("[Paper Live] Telegram notifications disabled (pass --telegram-token and --telegram-chat-id to enable)")
 
     config = PaperLiveRunnerConfig(
         strategy_id=f"{args.strategy}_paper_live",
@@ -252,6 +343,7 @@ def main(argv: list[str] | None = None) -> int:
         execution_broker=broker,
         portfolio=portfolio,
         dashboard_writer=dashboard_writer,
+        notifier=notifier,
     )
 
     def _kite_ticker_factory(api_key_: str, access_token_: str) -> object:
@@ -285,12 +377,25 @@ def main(argv: list[str] | None = None) -> int:
     signal.signal(signal.SIGINT, _handle_signal)
     signal.signal(signal.SIGTERM, _handle_signal)
 
+    gc_info = ""
+    if args.strategy == "gap_continuation":
+        direction = "long+short"
+        if args.gc_long_only:
+            direction = "long-only"
+        elif args.gc_short_only:
+            direction = "short-only"
+        gc_info = (
+            f"  GC params: min_gap={args.gc_min_gap_bps}bps  max_gap={args.gc_max_gap_bps}bps  "
+            f"trigger={args.gc_trigger_bps}bps  stop={args.gc_stop_bps}bps  "
+            f"qty={args.gc_quantity}  direction={direction}\n"
+        )
     print(
         f"\n[Paper Live] Starting paper trading\n"
         f"  Strategy : {args.strategy}\n"
         f"  Symbols  : {symbols}\n"
         f"  Interval : {args.interval_seconds}s candles\n"
         f"  Cash     : {initial_cash}\n"
+        f"{gc_info}"
         "\nPress Ctrl+C to stop.\n"
     )
     feed.connect()
