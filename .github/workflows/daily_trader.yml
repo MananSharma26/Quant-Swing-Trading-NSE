@@ -23,7 +23,8 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e . yfinance
+          pip install pandas yfinance python-dotenv pydantic pydantic-settings numpy sqlalchemy psycopg[binary] pyyaml kiteconnect pyarrow statsmodels
+          pip install -e . || true
 
       - name: Run Paper Trader
         env:
