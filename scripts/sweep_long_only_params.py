@@ -1,17 +1,18 @@
-"""Long-Only Black Swan parameter sweep for low-capital constraints."""
+"""Long-Only Black Swan parameter sweep for low-capital constraints.
+Refactored to include Train/Test split, 5-year yfinance data, and realized PnL optimization.
+"""
 
 from __future__ import annotations
 
 import argparse
 import json
-import math
 import sys
-from datetime import time
 from decimal import Decimal
 from itertools import product
 from pathlib import Path
 
 import pandas as pd
+import yfinance as yf
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
@@ -25,27 +26,67 @@ from trading_engine.backtest.simulated_broker import SimulatedBroker
 from trading_engine.backtest.slippage_model import SlippageModel
 from trading_engine.strategies.long_only_swan import LongOnlySwanConfig, LongOnlySwanStrategy
 
-DATA_DIR = ROOT / "data"
 REPORTS_DIR = ROOT / "reports"
 INITIAL_CASH = Decimal("100000") # 1 Lakh
 
 PARAM_GRID = {
-    "window_size": [30, 60, 90, 120, 180],
+    "window_size": [30, 60, 90, 120],
     "entry_z_score": [2.0, 2.5, 3.0, 3.5],
     "stop_loss_z_score": [4.0, 5.0, 6.0],
 }
+
+# Structurally/Economically Cointegrated Pairs
+SENSIBLE_PAIRS = [
+    ("HDFCBANK", "HDFCLIFE"),
+    ("BAJAJFINSV", "BAJFINANCE"),
+    ("INFY", "TCS"),
+    ("INFY", "WIPRO"),
+    ("TCS", "WIPRO"),
+    ("ICICIBANK", "AXISBANK"),
+    ("ICICIBANK", "KOTAKBANK"),
+    ("AXISBANK", "KOTAKBANK"),
+    ("RELIANCE", "ONGC"),
+    ("ITC", "HINDUNILVR")
+]
 
 def build_grid() -> list[dict]:
     keys = list(PARAM_GRID.keys())
     return [dict(zip(keys, combo, strict=True)) for combo in product(*PARAM_GRID.values())]
 
-def load_candles(symbols: list[str]) -> dict[str, pd.DataFrame]:
+def fetch_yfinance_data(symbols: list[str]) -> dict[str, pd.DataFrame]:
     candles = {}
-    for symbol in symbols:
-        path = DATA_DIR / "candles" / "NSE" / symbol / "day.parquet"
-        if path.exists():
-            candles[symbol] = pd.read_parquet(path)
+    for sym in symbols:
+        try:
+            df = yf.download(f"{sym}.NS", period="5y", interval="1d", progress=False)
+            if df.empty:
+                continue
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            df = df.rename(columns={
+                "Open": "open", "High": "high", "Low": "low",
+                "Close": "close", "Volume": "volume"
+            })
+            df.index.name = "timestamp"
+            df = df.ffill().dropna().reset_index()
+            
+            # Localize timezone to avoid issues with data feed
+            if df["timestamp"].dt.tz is None:
+                df["timestamp"] = df["timestamp"].dt.tz_localize("Asia/Kolkata")
+            else:
+                df["timestamp"] = df["timestamp"].dt.tz_convert("Asia/Kolkata")
+                
+            candles[sym] = df
+        except Exception as e:
+            print(f"Failed to fetch {sym}: {e}")
     return candles
+
+def split_train_test(candles: dict[str, pd.DataFrame], split_date: str) -> tuple[dict, dict]:
+    train, test = {}, {}
+    split_ts = pd.Timestamp(split_date).tz_localize("Asia/Kolkata")
+    for sym, df in candles.items():
+        train[sym] = df[df["timestamp"] < split_ts].copy()
+        test[sym] = df[df["timestamp"] >= split_ts].copy()
+    return train, test
 
 def run_single(candles: dict[str, pd.DataFrame], params: dict, symbols: list[str], qty_a: int, qty_b: int) -> dict:
     try:
@@ -85,88 +126,86 @@ def run_single(candles: dict[str, pd.DataFrame], params: dict, symbols: list[str
 
     row = {**params}
     row["error"] = None
-    row["total_pnl"] = float(m.total_pnl) if m.total_pnl else None
-    row["win_rate"] = float(m.win_rate) if m.win_rate else None
+    row["realized_pnl"] = float(m.realized_pnl) if m.realized_pnl else 0.0
+    row["win_rate"] = float(m.win_rate) if m.win_rate else 0.0
     row["trade_count"] = m.trade_count
+    row["max_drawdown"] = float(m.max_drawdown) if m.max_drawdown else 0.0
     return row
 
-def run_long_only_sweeper():
-    pairs_file = REPORTS_DIR / "cointegrated_pairs.jsonl"
-    if not pairs_file.exists():
-        print("No cointegrated_pairs.jsonl found.")
-        return
-        
-    pairs = []
-    with open(pairs_file, "r") as f:
-        for line in f:
-            pairs.append(json.loads(line.strip()))
-            
-    # Sort by p_value and take top 15
-    top_pairs = sorted([p for p in pairs if p["p_value"] < 0.05], key=lambda x: x["p_value"])[:15]
-    print(f"Sweeping {len(top_pairs)} pairs with Long-Only Engine (1 Lakh Capital per leg)...")
+def run_sweeper():
+    print("Fetching 5 years of history from Yahoo Finance...")
+    all_symbols = list(set([sym for pair in SENSIBLE_PAIRS for sym in pair]))
+    all_candles = fetch_yfinance_data(all_symbols)
+    
+    # Split Train: Before 2025-01-01, Test: 2025 onwards
+    train_candles, test_candles = split_train_test(all_candles, "2025-01-01")
     
     combos = build_grid()
     portfolio = []
     
-    for rank, pair_info in enumerate(top_pairs, 1):
-        sym_a = pair_info["symbol_a"]
-        sym_b = pair_info["symbol_b"]
-        
-        candles = load_candles([sym_a, sym_b])
-        if len(candles) < 2:
+    print(f"\nSweeping {len(SENSIBLE_PAIRS)} Sensible Pairs (Train/Test Split)...")
+    
+    for rank, (sym_a, sym_b) in enumerate(SENSIBLE_PAIRS, 1):
+        if sym_a not in all_candles or sym_b not in all_candles:
             continue
             
-        # Get approximate price to size quantity to 1,00,000 INR
-        price_a = candles[sym_a]["close"].iloc[-1]
-        price_b = candles[sym_b]["close"].iloc[-1]
+        price_a = all_candles[sym_a]["close"].iloc[-1]
+        price_b = all_candles[sym_b]["close"].iloc[-1]
         
         qty_a = max(1, int(100000 / price_a))
         qty_b = max(1, int(100000 / price_b))
         
-        print(f"\n[{rank}/15] {sym_a} / {sym_b} (Qty A: {qty_a}, Qty B: {qty_b})")
+        print(f"\n[{rank}/{len(SENSIBLE_PAIRS)}] {sym_a} / {sym_b} (Qty A: {qty_a}, Qty B: {qty_b})")
             
+        # 1. Train on In-Sample (pre-2025)
         best_pnl = 0
         best_result = None
         
         for i, params in enumerate(combos, 1):
-            row = run_single(candles, params, [sym_a, sym_b], qty_a, qty_b)
+            row = run_single(train_candles, params, [sym_a, sym_b], qty_a, qty_b)
             if not row.get("error"):
-                pnl = row.get("total_pnl", 0) or 0
-                trades = row.get("trade_count", 0) or 0
+                pnl = row.get("realized_pnl", 0)
+                trades = row.get("trade_count", 0)
                 
-                if pnl > best_pnl and trades > 0:
+                # REQUIRE at least 8 closed trades over 4 years
+                if pnl > best_pnl and trades >= 8:
                     best_pnl = pnl
                     best_result = row
                     
         if best_result:
-            win_rate = best_result.get('win_rate') or 0.0
-            print(f"  --> Best Config: win={best_result['window_size']} entZ={best_result['entry_z_score']} slZ={best_result['stop_loss_z_score']} "
-                  f"| Trades: {best_result['trade_count']} | PnL: {best_result['total_pnl']:+.2f} | Win Rate: {win_rate:.3f}")
-                  
-            portfolio.append({
-                "symbol_a": sym_a,
-                "symbol_b": sym_b,
-                "qty_a": qty_a,
-                "qty_b": qty_b,
-                "optimal_params": {
-                    "window_size": best_result["window_size"],
-                    "entry_z_score": best_result["entry_z_score"],
-                    "stop_loss_z_score": best_result["stop_loss_z_score"],
-                },
-                "backtest_metrics": {
-                    "pnl": best_result["total_pnl"],
-                    "win_rate": best_result["win_rate"],
-                    "trade_count": best_result["trade_count"],
-                }
-            })
+            # 2. Test on Out-Of-Sample (2025 onwards)
+            test_row = run_single(test_candles, best_result, [sym_a, sym_b], qty_a, qty_b)
+            test_pnl = test_row.get("realized_pnl", 0)
+            test_trades = test_row.get("trade_count", 0)
+            
+            print(f"  [Train] PnL: {best_result['realized_pnl']:+.2f} | Trades: {best_result['trade_count']} | Config: w={best_result['window_size']} eZ={best_result['entry_z_score']} sZ={best_result['stop_loss_z_score']}")
+            print(f"  [Test]  PnL: {test_pnl:+.2f} | Trades: {test_trades} | MaxDD: {test_row.get('max_drawdown', 0):.2f}%")
+            
+            if test_pnl >= 0:
+                print("  --> Passed Out-Of-Sample! Added to portfolio.")
+                portfolio.append({
+                    "symbol_a": sym_a,
+                    "symbol_b": sym_b,
+                    "qty_a": qty_a,
+                    "qty_b": qty_b,
+                    "optimal_params": {
+                        "window_size": best_result["window_size"],
+                        "entry_z_score": best_result["entry_z_score"],
+                        "stop_loss_z_score": best_result["stop_loss_z_score"],
+                    },
+                    "train_metrics": best_result,
+                    "test_metrics": test_row
+                })
+            else:
+                print("  --> Failed Out-Of-Sample! Discarded.")
         else:
-            print("  --> No profitable config.")
+            print("  --> No profitable config found with minimum trade threshold in Train set.")
             
     out_file = REPORTS_DIR / "optimal_long_only_portfolio.json"
     with open(out_file, "w") as f:
         json.dump(portfolio, f, indent=2)
         
-    print(f"\nDone! {len(portfolio)} profitable Long-Only setups found. Saved to {out_file}")
+    print(f"\nDone! {len(portfolio)} verified Robust Pairs found. Saved to {out_file}")
 
 if __name__ == "__main__":
-    run_long_only_sweeper()
+    run_sweeper()

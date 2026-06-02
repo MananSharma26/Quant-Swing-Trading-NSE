@@ -1,210 +1,126 @@
 [
   {
     "symbol_a": "BAJAJFINSV",
-    "symbol_b": "HDFCBANK",
-    "qty_a": 51,
-    "qty_b": 107,
-    "optimal_params": {
-      "window_size": 90,
-      "entry_z_score": 2.0,
-      "stop_loss_z_score": 4.0
-    },
-    "backtest_metrics": {
-      "pnl": 1772.85,
-      "win_rate": 0.3333333333333333,
-      "trade_count": 6
-    }
-  },
-  {
-    "symbol_a": "BPCL",
-    "symbol_b": "SBILIFE",
-    "qty_a": 282,
-    "qty_b": 49,
-    "optimal_params": {
-      "window_size": 30,
-      "entry_z_score": 3.0,
-      "stop_loss_z_score": 4.0
-    },
-    "backtest_metrics": {
-      "pnl": 4282.53,
-      "win_rate": 1.0,
-      "trade_count": 4
-    }
-  },
-  {
-    "symbol_a": "BAJAJFINSV",
-    "symbol_b": "TATACONSUM",
-    "qty_a": 51,
-    "qty_b": 88,
-    "optimal_params": {
-      "window_size": 180,
-      "entry_z_score": 3.0,
-      "stop_loss_z_score": 4.0
-    },
-    "backtest_metrics": {
-      "pnl": 38934.14,
-      "win_rate": null,
-      "trade_count": 1
-    }
-  },
-  {
-    "symbol_a": "HDFCBANK",
-    "symbol_b": "HDFCLIFE",
-    "qty_a": 107,
-    "qty_b": 137,
-    "optimal_params": {
-      "window_size": 60,
-      "entry_z_score": 2.0,
-      "stop_loss_z_score": 4.0
-    },
-    "backtest_metrics": {
-      "pnl": 21438.94,
-      "win_rate": 1.0,
-      "trade_count": 9
-    }
-  },
-  {
-    "symbol_a": "BAJAJFINSV",
-    "symbol_b": "HDFCLIFE",
-    "qty_a": 51,
-    "qty_b": 137,
+    "symbol_b": "BAJFINANCE",
+    "qty_a": 56,
+    "qty_b": 112,
     "optimal_params": {
       "window_size": 30,
       "entry_z_score": 2.0,
       "stop_loss_z_score": 4.0
     },
-    "backtest_metrics": {
-      "pnl": 3521.86,
-      "win_rate": 0.8571428571428571,
-      "trade_count": 14
+    "train_metrics": {
+      "window_size": 30,
+      "entry_z_score": 2.0,
+      "stop_loss_z_score": 4.0,
+      "error": null,
+      "realized_pnl": 123014.18,
+      "win_rate": 0.7619047619047619,
+      "trade_count": 43,
+      "max_drawdown": 0.4345419743509962
+    },
+    "test_metrics": {
+      "window_size": 30,
+      "entry_z_score": 2.0,
+      "stop_loss_z_score": 4.0,
+      "error": null,
+      "realized_pnl": 37991.48,
+      "win_rate": 0.7777777777777778,
+      "trade_count": 18,
+      "max_drawdown": 0.4272829385342237
     }
   },
   {
-    "symbol_a": "BRITANNIA",
-    "symbol_b": "GRASIM",
-    "qty_a": 17,
-    "qty_b": 35,
+    "symbol_a": "ICICIBANK",
+    "symbol_b": "AXISBANK",
+    "qty_a": 80,
+    "qty_b": 78,
     "optimal_params": {
-      "window_size": 90,
+      "window_size": 30,
       "entry_z_score": 2.0,
       "stop_loss_z_score": 4.0
     },
-    "backtest_metrics": {
-      "pnl": 66017.33,
-      "win_rate": 0.75,
-      "trade_count": 9
-    }
-  },
-  {
-    "symbol_a": "BAJAJFINSV",
-    "symbol_b": "WIPRO",
-    "qty_a": 51,
-    "qty_b": 422,
-    "optimal_params": {
-      "window_size": 90,
-      "entry_z_score": 2.5,
-      "stop_loss_z_score": 4.0
+    "train_metrics": {
+      "window_size": 30,
+      "entry_z_score": 2.0,
+      "stop_loss_z_score": 4.0,
+      "error": null,
+      "realized_pnl": 485157.78,
+      "win_rate": 0.9565217391304348,
+      "trade_count": 47,
+      "max_drawdown": 0.2589853494353573
     },
-    "backtest_metrics": {
-      "pnl": 5401.65,
-      "win_rate": 1.0,
-      "trade_count": 2
+    "test_metrics": {
+      "window_size": 30,
+      "entry_z_score": 2.0,
+      "stop_loss_z_score": 4.0,
+      "error": null,
+      "realized_pnl": 46773.4,
+      "win_rate": 0.6,
+      "trade_count": 20,
+      "max_drawdown": 0.2626038689668976
     }
   },
   {
-    "symbol_a": "BAJAJFINSV",
+    "symbol_a": "AXISBANK",
     "symbol_b": "KOTAKBANK",
-    "qty_a": 51,
-    "qty_b": 245,
-    "optimal_params": {
-      "window_size": 90,
-      "entry_z_score": 2.0,
-      "stop_loss_z_score": 4.0
-    },
-    "backtest_metrics": {
-      "pnl": 6712.49,
-      "win_rate": 1.0,
-      "trade_count": 2
-    }
-  },
-  {
-    "symbol_a": "BAJAJFINSV",
-    "symbol_b": "TCS",
-    "qty_a": 51,
-    "qty_b": 31,
-    "optimal_params": {
-      "window_size": 120,
-      "entry_z_score": 2.0,
-      "stop_loss_z_score": 4.0
-    },
-    "backtest_metrics": {
-      "pnl": 3443.9,
-      "win_rate": 1.0,
-      "trade_count": 2
-    }
-  },
-  {
-    "symbol_a": "BAJAJFINSV",
-    "symbol_b": "INFY",
-    "qty_a": 51,
-    "qty_b": 60,
-    "optimal_params": {
-      "window_size": 60,
-      "entry_z_score": 2.0,
-      "stop_loss_z_score": 4.0
-    },
-    "backtest_metrics": {
-      "pnl": 28554.75,
-      "win_rate": null,
-      "trade_count": 9
-    }
-  },
-  {
-    "symbol_a": "BAJAJFINSV",
-    "symbol_b": "BRITANNIA",
-    "qty_a": 51,
-    "qty_b": 17,
-    "optimal_params": {
-      "window_size": 30,
-      "entry_z_score": 2.5,
-      "stop_loss_z_score": 4.0
-    },
-    "backtest_metrics": {
-      "pnl": 3031.46,
-      "win_rate": 0.75,
-      "trade_count": 8
-    }
-  },
-  {
-    "symbol_a": "BPCL",
-    "symbol_b": "BHARTIARTL",
-    "qty_a": 282,
-    "qty_b": 50,
+    "qty_a": 78,
+    "qty_b": 264,
     "optimal_params": {
       "window_size": 30,
       "entry_z_score": 2.0,
       "stop_loss_z_score": 4.0
     },
-    "backtest_metrics": {
-      "pnl": 85141.83,
-      "win_rate": 0.8571428571428571,
-      "trade_count": 15
+    "train_metrics": {
+      "window_size": 30,
+      "entry_z_score": 2.0,
+      "stop_loss_z_score": 4.0,
+      "error": null,
+      "realized_pnl": 76697.52,
+      "win_rate": 0.84,
+      "trade_count": 51,
+      "max_drawdown": 0.3785454420030003
+    },
+    "test_metrics": {
+      "window_size": 30,
+      "entry_z_score": 2.0,
+      "stop_loss_z_score": 4.0,
+      "error": null,
+      "realized_pnl": 28824.37,
+      "win_rate": 0.625,
+      "trade_count": 17,
+      "max_drawdown": 0.4747791036979582
     }
   },
   {
-    "symbol_a": "BAJAJFINSV",
-    "symbol_b": "BPCL",
-    "qty_a": 51,
-    "qty_b": 282,
+    "symbol_a": "RELIANCE",
+    "symbol_b": "ONGC",
+    "qty_a": 75,
+    "qty_b": 378,
     "optimal_params": {
-      "window_size": 60,
+      "window_size": 30,
       "entry_z_score": 2.0,
       "stop_loss_z_score": 4.0
     },
-    "backtest_metrics": {
-      "pnl": 91540.14,
-      "win_rate": 1.0,
-      "trade_count": 7
+    "train_metrics": {
+      "window_size": 30,
+      "entry_z_score": 2.0,
+      "stop_loss_z_score": 4.0,
+      "error": null,
+      "realized_pnl": 1536344.5,
+      "win_rate": 0.8461538461538461,
+      "trade_count": 53,
+      "max_drawdown": 3.6079729809589303
+    },
+    "test_metrics": {
+      "window_size": 30,
+      "entry_z_score": 2.0,
+      "stop_loss_z_score": 4.0,
+      "error": null,
+      "realized_pnl": 323345.63,
+      "win_rate": 0.875,
+      "trade_count": 16,
+      "max_drawdown": 3.7840316240112304
     }
   }
 ]
