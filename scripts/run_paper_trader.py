@@ -32,6 +32,7 @@ _log = logging.getLogger(__name__)
 
 REPORTS_DIR = ROOT / "reports"
 CAPITAL_PER_LEG = 100_000
+PAPER_TRADING_START = "2026-06-01"  # Only count P&L from this date onwards
 
 
 def load_portfolio() -> list[dict]:
@@ -125,10 +126,16 @@ def replay_pair(sym_a: str, sym_b: str, params: dict) -> dict:
         is_today = (ts.date() == today_date)
         days_held = (ts - entry_date).days if entry_date else 0
 
+        paper_start = pd.Timestamp(PAPER_TRADING_START).date()
+
         def close_position(close_sym: str, close_price: float, reason: str) -> None:
             nonlocal realized_pnl, position, entry_price, entry_qty, entry_date, stop_price
             pnl = (close_price - entry_price) * entry_qty
-            realized_pnl += pnl
+            exit_date = ts.date()
+            # Only count P&L for trades entered on or after paper trading start
+            is_live_trade = entry_date and entry_date.date() >= paper_start
+            if is_live_trade:
+                realized_pnl += pnl
             trade = {
                 "pair": f"{sym_a}/{sym_b}",
                 "side": position,
@@ -139,10 +146,12 @@ def replay_pair(sym_a: str, sym_b: str, params: dict) -> dict:
                 "pnl": round(pnl, 2),
                 "reason": reason,
                 "entry_date": str(entry_date.date()) if entry_date else "",
-                "exit_date": str(ts.date()),
+                "exit_date": str(exit_date),
+                "live": is_live_trade,
             }
-            closed_trades.append(trade)
-            if is_today:
+            if is_live_trade:
+                closed_trades.append(trade)
+            if is_today and is_live_trade:
                 today_closed.append(trade)
             position = None
             entry_price = 0.0

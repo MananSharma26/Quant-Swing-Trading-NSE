@@ -33,6 +33,7 @@ REPORTS_DIR = ROOT / "reports"
 BB_WINDOW = 20
 BB_STD_MULT = 2.0
 CAPITAL_PER_TRADE = 100_000
+PAPER_TRADING_START = "2026-06-01"  # Only count P&L from this date onwards
 
 
 def load_portfolio() -> list[dict]:
@@ -88,10 +89,14 @@ def replay_symbol(df: pd.DataFrame, params: dict) -> dict:
     today_closed: list[dict] = []
     today_entry: dict | None = None
 
+    paper_start = pd.Timestamp(PAPER_TRADING_START).date()
+
     def close_trade(exit_price: float, exit_date: pd.Timestamp, reason: str) -> None:
         nonlocal realized_pnl, in_position, qty, entry_price, entry_date, stop_price
         pnl = (exit_price - entry_price) * qty
-        realized_pnl += pnl
+        is_live_trade = entry_date and entry_date.date() >= paper_start
+        if is_live_trade:
+            realized_pnl += pnl
         trade = {
             "entry_date": str(entry_date.date()) if entry_date else "",
             "exit_date": str(exit_date.date()),
@@ -101,9 +106,10 @@ def replay_symbol(df: pd.DataFrame, params: dict) -> dict:
             "pnl": round(pnl, 2),
             "reason": reason,
         }
-        closed_trades.append(trade)
-        if exit_date.date() == today_date:
-            today_closed.append(trade)
+        if is_live_trade:
+            closed_trades.append(trade)
+            if exit_date.date() == today_date:
+                today_closed.append(trade)
         in_position = False
         qty = 0
         entry_price = 0.0
