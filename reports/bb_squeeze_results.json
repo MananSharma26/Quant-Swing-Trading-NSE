@@ -1,0 +1,848 @@
+{
+  "strategy": "bb_squeeze_breakout",
+  "train_end": "2025-01-01",
+  "capital_per_trade": 100000,
+  "run_date": "2026-06-03T11:54:40.558496",
+  "results": [
+    {
+      "symbol": "RELIANCE",
+      "best_params": {
+        "squeeze_threshold": 0.08,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 10
+      },
+      "train": {
+        "realized_pnl": 9706.38,
+        "win_rate": 0.6667,
+        "trade_count": 12,
+        "max_drawdown": -9027.75
+      },
+      "test": {
+        "realized_pnl": 3307.52,
+        "win_rate": 0.6,
+        "trade_count": 5,
+        "max_drawdown": -6899.2
+      },
+      "pass_oos": true
+    },
+    {
+      "symbol": "TCS",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 37614.55,
+        "win_rate": 0.5,
+        "trade_count": 14,
+        "max_drawdown": -11571.51
+      },
+      "test": {
+        "realized_pnl": -8508.51,
+        "win_rate": 0.25,
+        "trade_count": 4,
+        "max_drawdown": -9504.61
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "HDFCBANK",
+      "best_params": {
+        "squeeze_threshold": 0.05,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 10
+      },
+      "train": {
+        "realized_pnl": 9436.79,
+        "win_rate": 0.5,
+        "trade_count": 8,
+        "max_drawdown": -7039.86
+      },
+      "test": {
+        "realized_pnl": -6446.81,
+        "win_rate": 0.25,
+        "trade_count": 4,
+        "max_drawdown": -10656.41
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "INFY",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 3.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 16744.06,
+        "win_rate": 0.5,
+        "trade_count": 16,
+        "max_drawdown": -12169.21
+      },
+      "test": {
+        "realized_pnl": -7861.44,
+        "win_rate": 0.2,
+        "trade_count": 5,
+        "max_drawdown": -12511.54
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "ICICIBANK",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 10
+      },
+      "train": {
+        "realized_pnl": 2502.71,
+        "win_rate": 0.4167,
+        "trade_count": 24,
+        "max_drawdown": -18307.78
+      },
+      "test": {
+        "realized_pnl": -8845.34,
+        "win_rate": 0.5,
+        "trade_count": 6,
+        "max_drawdown": -11722.55
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "KOTAKBANK",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 10
+      },
+      "train": {
+        "realized_pnl": -4365.27,
+        "win_rate": 0.4,
+        "trade_count": 20,
+        "max_drawdown": -19159.32
+      },
+      "test": {
+        "realized_pnl": 143.83,
+        "win_rate": 0.4,
+        "trade_count": 10,
+        "max_drawdown": -8519.43
+      },
+      "pass_oos": true
+    },
+    {
+      "symbol": "HINDUNILVR",
+      "best_params": {
+        "squeeze_threshold": 0.05,
+        "stop_loss_pct": 3.0,
+        "max_hold_days": 20
+      },
+      "train": {
+        "realized_pnl": 3875.45,
+        "win_rate": 0.4167,
+        "trade_count": 12,
+        "max_drawdown": -15401.85
+      },
+      "test": {
+        "realized_pnl": -10957.81,
+        "win_rate": 0.25,
+        "trade_count": 4,
+        "max_drawdown": -10957.8
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "AXISBANK",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 3.0,
+        "max_hold_days": 10
+      },
+      "train": {
+        "realized_pnl": 7165.67,
+        "win_rate": 0.5789,
+        "trade_count": 19,
+        "max_drawdown": -9625.97
+      },
+      "test": {
+        "realized_pnl": -5071.7,
+        "win_rate": 0.4444,
+        "trade_count": 9,
+        "max_drawdown": -11381.82
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "SBIN",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 3.0,
+        "max_hold_days": 10
+      },
+      "train": {
+        "realized_pnl": 19822.62,
+        "win_rate": 0.5294,
+        "trade_count": 17,
+        "max_drawdown": -18184.05
+      },
+      "test": {
+        "realized_pnl": 8118.96,
+        "win_rate": 0.6,
+        "trade_count": 10,
+        "max_drawdown": -12947.83
+      },
+      "pass_oos": true
+    },
+    {
+      "symbol": "BAJFINANCE",
+      "best_params": {
+        "squeeze_threshold": 0.08,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 20
+      },
+      "train": {
+        "realized_pnl": 11415.33,
+        "win_rate": 0.4167,
+        "trade_count": 12,
+        "max_drawdown": -13581.75
+      },
+      "test": {
+        "realized_pnl": 296.58,
+        "win_rate": 0.3333,
+        "trade_count": 6,
+        "max_drawdown": -15730.71
+      },
+      "pass_oos": true
+    },
+    {
+      "symbol": "BHARTIARTL",
+      "best_params": {
+        "squeeze_threshold": 0.08,
+        "stop_loss_pct": 3.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 47177.94,
+        "win_rate": 0.6667,
+        "trade_count": 15,
+        "max_drawdown": -8512.53
+      },
+      "test": {
+        "realized_pnl": -12000.5,
+        "win_rate": 0.1429,
+        "trade_count": 7,
+        "max_drawdown": -12462.35
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "WIPRO",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 10
+      },
+      "train": {
+        "realized_pnl": 16332.94,
+        "win_rate": 0.6316,
+        "trade_count": 19,
+        "max_drawdown": -7243.58
+      },
+      "test": {
+        "realized_pnl": 3675.15,
+        "win_rate": 0.6,
+        "trade_count": 5,
+        "max_drawdown": -4765.23
+      },
+      "pass_oos": true
+    },
+    {
+      "symbol": "LT",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 20
+      },
+      "train": {
+        "realized_pnl": -7564.2,
+        "win_rate": 0.3913,
+        "trade_count": 23,
+        "max_drawdown": -20736.52
+      },
+      "test": {
+        "realized_pnl": -8956.8,
+        "win_rate": 0.4,
+        "trade_count": 5,
+        "max_drawdown": -14754.15
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "MARUTI",
+      "best_params": {
+        "squeeze_threshold": 0.08,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 20
+      },
+      "train": {
+        "realized_pnl": 32264.43,
+        "win_rate": 0.5625,
+        "trade_count": 16,
+        "max_drawdown": -7907.4
+      },
+      "test": {
+        "realized_pnl": 10792.68,
+        "win_rate": 0.5,
+        "trade_count": 6,
+        "max_drawdown": -6670.84
+      },
+      "pass_oos": true
+    },
+    {
+      "symbol": "TITAN",
+      "best_params": {
+        "squeeze_threshold": 0.08,
+        "stop_loss_pct": 3.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 25675.67,
+        "win_rate": 0.5385,
+        "trade_count": 13,
+        "max_drawdown": -11561.74
+      },
+      "test": {
+        "realized_pnl": 1950.23,
+        "win_rate": 0.5,
+        "trade_count": 6,
+        "max_drawdown": -10409.9
+      },
+      "pass_oos": true
+    },
+    {
+      "symbol": "ASIANPAINT",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 8.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 6707.61,
+        "win_rate": 0.375,
+        "trade_count": 16,
+        "max_drawdown": -17408.49
+      },
+      "test": {
+        "realized_pnl": 24035.85,
+        "win_rate": 0.5,
+        "trade_count": 6,
+        "max_drawdown": -6469.81
+      },
+      "pass_oos": true
+    },
+    {
+      "symbol": "NESTLEIND",
+      "best_params": {
+        "squeeze_threshold": 0.08,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 16762.33,
+        "win_rate": 0.5,
+        "trade_count": 18,
+        "max_drawdown": -12554.88
+      },
+      "test": {
+        "realized_pnl": 17053.37,
+        "win_rate": 0.6667,
+        "trade_count": 6,
+        "max_drawdown": -6608.53
+      },
+      "pass_oos": true
+    },
+    {
+      "symbol": "ULTRACEMCO",
+      "best_params": {
+        "squeeze_threshold": 0.08,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 10
+      },
+      "train": {
+        "realized_pnl": 18934.45,
+        "win_rate": 0.619,
+        "trade_count": 21,
+        "max_drawdown": -8305.76
+      },
+      "test": {
+        "realized_pnl": 9110.99,
+        "win_rate": 0.75,
+        "trade_count": 4,
+        "max_drawdown": -3619.89
+      },
+      "pass_oos": true
+    },
+    {
+      "symbol": "BAJAJFINSV",
+      "best_params": {
+        "squeeze_threshold": 0.08,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 7883.7,
+        "win_rate": 0.4444,
+        "trade_count": 9,
+        "max_drawdown": -12588.35
+      },
+      "test": {
+        "realized_pnl": -6007.48,
+        "win_rate": 0.0,
+        "trade_count": 2,
+        "max_drawdown": -8879.93
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "SUNPHARMA",
+      "best_params": {
+        "squeeze_threshold": 0.08,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 63825.75,
+        "win_rate": 0.6875,
+        "trade_count": 16,
+        "max_drawdown": -10493.03
+      },
+      "test": {
+        "realized_pnl": -6475.43,
+        "win_rate": 0.25,
+        "trade_count": 4,
+        "max_drawdown": -8044.54
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "TECHM",
+      "best_params": {
+        "squeeze_threshold": 0.08,
+        "stop_loss_pct": 3.0,
+        "max_hold_days": 20
+      },
+      "train": {
+        "realized_pnl": 8220.03,
+        "win_rate": 0.3846,
+        "trade_count": 13,
+        "max_drawdown": -15594.29
+      },
+      "test": {
+        "realized_pnl": 966.2,
+        "win_rate": 0.5,
+        "trade_count": 4,
+        "max_drawdown": -11146.74
+      },
+      "pass_oos": true
+    },
+    {
+      "symbol": "POWERGRID",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 3.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 24723.72,
+        "win_rate": 0.44,
+        "trade_count": 25,
+        "max_drawdown": -23626.94
+      },
+      "test": {
+        "realized_pnl": 16585.04,
+        "win_rate": 0.6,
+        "trade_count": 5,
+        "max_drawdown": -6453.25
+      },
+      "pass_oos": true
+    },
+    {
+      "symbol": "NTPC",
+      "best_params": {
+        "squeeze_threshold": 0.08,
+        "stop_loss_pct": 3.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 75194.72,
+        "win_rate": 0.75,
+        "trade_count": 12,
+        "max_drawdown": -6477.07
+      },
+      "test": {
+        "realized_pnl": -7803.73,
+        "win_rate": 0.2,
+        "trade_count": 5,
+        "max_drawdown": -8022.22
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "COALINDIA",
+      "best_params": {
+        "squeeze_threshold": 0.08,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 20
+      },
+      "train": {
+        "realized_pnl": 21245.5,
+        "win_rate": 0.3,
+        "trade_count": 10,
+        "max_drawdown": -23299.61
+      },
+      "test": {
+        "realized_pnl": -6535.37,
+        "win_rate": 0.3333,
+        "trade_count": 6,
+        "max_drawdown": -9533.72
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "ONGC",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 3.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 63245.65,
+        "win_rate": 0.5833,
+        "trade_count": 12,
+        "max_drawdown": -10211.98
+      },
+      "test": {
+        "realized_pnl": -5466.7,
+        "win_rate": 0.4,
+        "trade_count": 5,
+        "max_drawdown": -20757.02
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "BPCL",
+      "best_params": {
+        "squeeze_threshold": 0.08,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 67871.13,
+        "win_rate": 0.4545,
+        "trade_count": 11,
+        "max_drawdown": -12966.47
+      },
+      "test": {
+        "realized_pnl": -2184.67,
+        "win_rate": 0.6,
+        "trade_count": 5,
+        "max_drawdown": -9700.0
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "ITC",
+      "best_params": {
+        "squeeze_threshold": 0.05,
+        "stop_loss_pct": 8.0,
+        "max_hold_days": 20
+      },
+      "train": {
+        "realized_pnl": 33463.31,
+        "win_rate": 0.5,
+        "trade_count": 16,
+        "max_drawdown": -13476.41
+      },
+      "test": {
+        "realized_pnl": -8747.23,
+        "win_rate": 0.1667,
+        "trade_count": 6,
+        "max_drawdown": -8865.86
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "DRREDDY",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 18159.66,
+        "win_rate": 0.3333,
+        "trade_count": 15,
+        "max_drawdown": -13324.09
+      },
+      "test": {
+        "realized_pnl": 3701.56,
+        "win_rate": 0.5,
+        "trade_count": 4,
+        "max_drawdown": -7319.2
+      },
+      "pass_oos": true
+    },
+    {
+      "symbol": "DIVISLAB",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 3.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 6851.77,
+        "win_rate": 0.25,
+        "trade_count": 20,
+        "max_drawdown": -19043.82
+      },
+      "test": {
+        "realized_pnl": -6601.7,
+        "win_rate": 0.1429,
+        "trade_count": 7,
+        "max_drawdown": -15916.69
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "HCLTECH",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 8.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 62404.32,
+        "win_rate": 0.6667,
+        "trade_count": 15,
+        "max_drawdown": -8998.17
+      },
+      "test": {
+        "realized_pnl": -8873.23,
+        "win_rate": 0.25,
+        "trade_count": 4,
+        "max_drawdown": -18416.45
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "TATASTEEL",
+      "best_params": {
+        "squeeze_threshold": 0.08,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 10
+      },
+      "train": {
+        "realized_pnl": -5971.96,
+        "win_rate": 0.5455,
+        "trade_count": 11,
+        "max_drawdown": -17728.4
+      },
+      "test": {
+        "realized_pnl": -5539.79,
+        "win_rate": 0.5,
+        "trade_count": 6,
+        "max_drawdown": -8588.91
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "JSWSTEEL",
+      "best_params": {
+        "squeeze_threshold": 0.08,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 17362.29,
+        "win_rate": 0.5556,
+        "trade_count": 9,
+        "max_drawdown": -13094.67
+      },
+      "test": {
+        "realized_pnl": -14839.84,
+        "win_rate": 0.3,
+        "trade_count": 10,
+        "max_drawdown": -20741.88
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "HINDALCO",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 3.0,
+        "max_hold_days": 20
+      },
+      "train": {
+        "realized_pnl": 12793.03,
+        "win_rate": 0.5,
+        "trade_count": 14,
+        "max_drawdown": -10452.55
+      },
+      "test": {
+        "realized_pnl": 14623.0,
+        "win_rate": 0.5,
+        "trade_count": 10,
+        "max_drawdown": -10400.75
+      },
+      "pass_oos": true
+    },
+    {
+      "symbol": "ADANIENT",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 8.0,
+        "max_hold_days": 20
+      },
+      "train": {
+        "realized_pnl": 13298.56,
+        "win_rate": 0.25,
+        "trade_count": 12,
+        "max_drawdown": -24541.87
+      },
+      "test": {
+        "realized_pnl": -5626.38,
+        "win_rate": 0.3333,
+        "trade_count": 3,
+        "max_drawdown": -8268.58
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "ADANIPORTS",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 8.0,
+        "max_hold_days": 10
+      },
+      "train": {
+        "realized_pnl": 31762.15,
+        "win_rate": 0.4545,
+        "trade_count": 11,
+        "max_drawdown": -12194.46
+      },
+      "test": {
+        "realized_pnl": -1478.2,
+        "win_rate": 0.3333,
+        "trade_count": 3,
+        "max_drawdown": -5914.4
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "APOLLOHOSP",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 8.0,
+        "max_hold_days": 20
+      },
+      "train": {
+        "realized_pnl": 9080.87,
+        "win_rate": 0.4545,
+        "trade_count": 22,
+        "max_drawdown": -20482.42
+      },
+      "test": {
+        "realized_pnl": -5049.12,
+        "win_rate": 0.1667,
+        "trade_count": 6,
+        "max_drawdown": -15719.77
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "GRASIM",
+      "best_params": {
+        "squeeze_threshold": 0.08,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 10
+      },
+      "train": {
+        "realized_pnl": 15653.67,
+        "win_rate": 0.5882,
+        "trade_count": 17,
+        "max_drawdown": -13128.22
+      },
+      "test": {
+        "realized_pnl": -16946.97,
+        "win_rate": 0.25,
+        "trade_count": 8,
+        "max_drawdown": -23485.35
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "TATACONSUM",
+      "best_params": {
+        "squeeze_threshold": 0.05,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 24032.18,
+        "win_rate": 0.5,
+        "trade_count": 10,
+        "max_drawdown": -7619.51
+      },
+      "test": {
+        "realized_pnl": -3881.55,
+        "win_rate": 0.0,
+        "trade_count": 2,
+        "max_drawdown": -4270.36
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "BRITANNIA",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 33821.02,
+        "win_rate": 0.5625,
+        "trade_count": 16,
+        "max_drawdown": -8346.83
+      },
+      "test": {
+        "realized_pnl": -23483.61,
+        "win_rate": 0.1429,
+        "trade_count": 7,
+        "max_drawdown": -27103.17
+      },
+      "pass_oos": false
+    },
+    {
+      "symbol": "EICHERMOT",
+      "best_params": {
+        "squeeze_threshold": 0.1,
+        "stop_loss_pct": 5.0,
+        "max_hold_days": 30
+      },
+      "train": {
+        "realized_pnl": 42017.0,
+        "win_rate": 0.4286,
+        "trade_count": 14,
+        "max_drawdown": -14398.08
+      },
+      "test": {
+        "realized_pnl": -15194.88,
+        "win_rate": 0.1667,
+        "trade_count": 6,
+        "max_drawdown": -15194.88
+      },
+      "pass_oos": false
+    }
+  ]
+}
