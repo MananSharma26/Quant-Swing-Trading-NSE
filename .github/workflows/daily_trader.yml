@@ -26,16 +26,9 @@ jobs:
           pip install pandas yfinance python-dotenv pydantic pydantic-settings numpy sqlalchemy psycopg[binary] pyyaml kiteconnect pyarrow statsmodels
           pip install -e . || true
 
-      - name: Run Long-Only Black Swan Trader
+      - name: Run Master Risk Engine
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python scripts/run_paper_trader.py
-
-      - name: Run BB Squeeze Swing Trader
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          python scripts/run_bb_squeeze_trader.py
+          python scripts/run_master_trader.py
