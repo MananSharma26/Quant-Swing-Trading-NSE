@@ -1,6 +1,6 @@
-# Quantitative Swing Trading Engine — NSE India
+# Quantitative Swing Trading Engine: NSE India
 
-A fully automated, stateless daily paper trading engine for Indian equities (NSE). No database. No persistent state. Every morning it replays 1–2 years of market history from scratch to reconstruct the portfolio, then sends a single Telegram digest with new entries, exits, open positions, and P&L. GitHub Actions handles the rest.
+A fully automated, stateless daily paper trading engine for Indian equities (NSE). No database. No persistent state. Every morning it replays 1-2 years of market history from scratch to reconstruct the portfolio, then sends a single Telegram digest with new entries, exits, open positions, and P&L. GitHub Actions handles the rest.
 
 ---
 
@@ -12,20 +12,23 @@ The deployed system is the end result of a methodical process that started with 
 
 The initial research phase tested strategies across multiple archetypes:
 
-| Strategy type | Verdict |
+| Strategy type | Why it was discarded |
 |---|---|
-| Intraday momentum (ORB) | Discarded — did not survive OOS |
-| Gap continuation | Discarded — did not survive OOS |
-| Gap fade | Discarded — did not survive OOS |
-| VWAP mean reversion | Discarded — did not survive OOS |
+| Opening Range Breakout (ORB) | Strong in-sample, collapsed OOS on most symbols |
+| First Hour Momentum | High win rate in training, no edge on unseen data |
+| 52-Week High Breakout | Worked in bull runs, failed badly in sideways markets OOS |
+| Gap Continuation | Too dependent on specific volatility regimes |
+| Gap Fade | Negative expected value once realistic slippage was applied |
+| VWAP Mean Reversion | Required intraday data; signal quality degraded on daily bars |
+| Pairs Cointegration (short-side) | Cointegration broke down OOS on most tested pairs |
 
-These strategies showed promise in-sample but failed when tested on unseen 2025 data. The rule was simple: if it doesn't hold up out-of-sample, it doesn't get deployed.
+These strategies showed promise in-sample but failed when tested on unseen 2025 data. The rule was simple: if it does not hold up out-of-sample, it does not get deployed.
 
 ### The OOS validation methodology
 
 Each strategy candidate was backtested on historical data up to end-2024 (train set), then evaluated on 2025 data it had never seen (test set). Parameters were optimised on train data only. Strategies that produced negative P&L or clearly degraded behaviour on the test set were eliminated before any combination work began.
 
-This matters. It is easy to build a strategy that looks good on historical data — the harder discipline is respecting the train/test boundary and not cherry-picking results.
+This matters. It is easy to build a strategy that looks good on historical data; the harder discipline is respecting the train/test boundary and not cherry-picking results.
 
 ### Strategies that made the shortlist
 
@@ -42,7 +45,7 @@ Only the symbols that passed OOS validation are included in the deployed portfol
 
 ### What was tested but excluded from the final combination
 
-**RSI(2) Mean Reversion** — a short-term mean reversion strategy using a 2-period RSI on stocks above their 200-day MA. It passed OOS on a handful of symbols (HDFCBANK, LT, BHARTIARTL, SBIN) but the signal frequency on the OOS window was too thin to draw statistically meaningful conclusions about combination behaviour. It was excluded from the final deployed combination.
+**RSI(2) Mean Reversion**: a short-term mean reversion strategy using a 2-period RSI on stocks above their 200-day MA. It passed OOS on a handful of symbols (HDFCBANK, LT, BHARTIARTL, SBIN) but the signal frequency on the OOS window was too thin to draw statistically meaningful conclusions about combination behaviour. It was excluded from the final deployed combination.
 
 ---
 
@@ -53,7 +56,7 @@ A collection of profitable strategies is not the same as a robust system. The Ma
 ### Capital structure
 
 - **Total account:** ₹2,00,000
-- **Minimum position size:** ₹50,000 (hard floor — below this, no trade is taken)
+- **Minimum position size:** ₹50,000 (hard floor; below this, no trade is taken)
 - **Leverage:** None. Cash only.
 
 ### Priority-based allocation
@@ -61,17 +64,17 @@ A collection of profitable strategies is not the same as a robust system. The Ma
 When multiple strategies fire signals on the same day, capital is rationed in priority order:
 
 ```
-MA Pullback  (priority 3 — highest)
+MA Pullback  (priority 3, highest)
 BB Squeeze   (priority 2)
 Supertrend   (priority 2)
-Black Swan   (priority 1 — lowest)
+Black Swan   (priority 1, lowest)
 ```
 
 The number of slots available is determined by `floor(free_cash / 50,000)`. The top-ranked signals fill those slots first. Lower-ranked signals are rejected with an explanation in the Telegram digest.
 
 ### Dynamic position sizing
 
-Capital is not statically allocated per strategy. When signals are approved, the available free cash is divided equally across all concurrent approved signals. This means position sizes compound naturally as profits accumulate — a ₹2L account that has grown to ₹2.4L through realized gains will deploy larger chunks on the next signal, without any manual intervention.
+Capital is not statically allocated per strategy. When signals are approved, the available free cash is divided equally across all concurrent approved signals. This means position sizes compound naturally as profits accumulate. A ₹2L account that has grown to ₹2.4L through realized gains will deploy larger chunks on the next signal, without any manual intervention.
 
 ### Capital safety gate
 
@@ -79,7 +82,7 @@ If any strategy fails to fetch market data for its symbols, the engine cannot ac
 
 ### Stateless daily replay
 
-There is no database storing trade state. Every time the engine runs, it re-downloads 1–2 years of daily OHLCV data and replays the full trading logic from scratch to reconstruct the current portfolio state. This makes the system trivially auditable — you can run it locally at any time and get the same answer. It also eliminates an entire class of bugs around state corruption or migration.
+There is no database storing trade state. Every time the engine runs, it re-downloads 1–2 years of daily OHLCV data and replays the full trading logic from scratch to reconstruct the current portfolio state. This makes the system trivially auditable: you can run it locally at any time and get the same answer. It also eliminates an entire class of bugs around state corruption or migration.
 
 ---
 
@@ -98,7 +101,7 @@ Four combinations were simulated over 10 years on a ₹2L account using the Mast
 | BB + ST + Swan | 5.7% | 0.49 | 60.5% | 5/10 |
 | **All 4 (deployed)** | **20.1%** | **1.10** | **35.6%** | **2/10** |
 
-BB + ST + Swan was quickly ruled out — the absence of MA Pullback created long periods of capital starvation where high-priority signals were rarely present, leaving capital idle and dragging returns. Its 60.5% max drawdown also disqualified it on risk grounds.
+BB + ST + Swan was quickly ruled out: the absence of MA Pullback created long periods of capital starvation where high-priority signals were rarely present, leaving capital idle and dragging returns. Its 60.5% max drawdown also disqualified it on risk grounds.
 
 ### Walk-forward validation
 
@@ -107,11 +110,11 @@ Picking the best-looking combination from a 10-year backtest introduces its own 
 - **Method:** Expanding window. Train on 2016–(Y−1), select the best combination by Sharpe, Calmar, or total return. Then measure that combination's actual return in year Y.
 - **OOS windows:** 2021, 2022, 2023, 2024, 2025 (5 out-of-sample years)
 
-The result was that no single selection criterion — Sharpe, Calmar, or total return — consistently identified the combination that would perform best in the following year. Selection performance was close to random across the 5 OOS years.
+The result was that no single selection criterion (Sharpe, Calmar, or total return) consistently identified the combination that would perform best in the following year. Selection performance was close to random across the 5 OOS years.
 
 This is an important finding. It means the apparently "smart" approach of periodically reselecting your strategy combination based on past performance does not add value over the test horizon. The practical implication: just run all four strategies consistently. The walk-forward results showed that running All 4 produced comparable or better risk-adjusted returns than any adaptive selection scheme.
 
-**Deployed configuration: All 4 strategies — CAGR 20.1%, Sharpe 1.10, max drawdown 35.6%, 2 negative years in 10.**
+**Deployed configuration: All 4 strategies. CAGR 20.1%, Sharpe 1.10, max drawdown 35.6%, 2 negative years in 10.**
 
 ---
 
@@ -150,8 +153,8 @@ pip install -e .
 ### Environment variables
 
 ```
-TELEGRAM_BOT_TOKEN   — from BotFather
-TELEGRAM_CHAT_ID     — your chat or channel ID
+TELEGRAM_BOT_TOKEN   # from BotFather
+TELEGRAM_CHAT_ID     # your chat or channel ID
 ```
 
 For GitHub Actions, add these as repository secrets.
@@ -181,27 +184,28 @@ python archive/walk_forward_analysis.py
 
 ```
 scripts/
-  run_master_trader.py          — deployed daily engine
-  run_ma_pullback_trader.py     — MA Pullback standalone
-  run_bb_squeeze_trader.py      — BB Squeeze standalone
-  run_paper_trader.py           — Black Swan standalone
+  run_master_trader.py          # deployed daily engine (all 4 strategies)
+  run_ma_pullback_trader.py     # MA Pullback standalone
+  run_bb_squeeze_trader.py      # BB Squeeze standalone
+  run_supertrend_trader.py      # Supertrend standalone
+  run_paper_trader.py           # Black Swan standalone
 
 reports/
-  optimal_ma_pullback_portfolio.json   — 5 OOS-validated symbols
-  optimal_supertrend_portfolio.json    — 7 OOS-validated symbols
-  bb_squeeze_results.json              — 12/40 symbols passed OOS
-  optimal_long_only_portfolio.json     — 3 OOS-validated pairs
+  optimal_ma_pullback_portfolio.json   # 5 OOS-validated symbols
+  optimal_supertrend_portfolio.json    # 7 OOS-validated symbols
+  bb_squeeze_results.json              # 12/40 symbols passed OOS
+  optimal_long_only_portfolio.json     # 3 OOS-validated pairs
 
 archive/
-  simulate_combinations.py     — 10-year combination backtest
-  walk_forward_analysis.py     — walk-forward + risk metrics
+  simulate_combinations.py     # 10-year combination backtest
+  walk_forward_analysis.py     # walk-forward + risk metrics
 
 .github/workflows/
-  daily_trader.yml              — cron trigger at 3:15 PM IST, Mon–Fri
+  daily_trader.yml              # cron trigger at 3:15 PM IST, Mon-Fri
 ```
 
 ---
 
 ## What This Is Not
 
-This is a paper trading engine — it tracks signals and sends digests, but does not place live orders. There is no broker integration in the deployed path. The system is designed for signal generation, portfolio tracking, and strategy research on Indian equities.
+This is a paper trading engine. It tracks signals and sends digests, but does not place live orders. There is no broker integration in the deployed path. The system is designed for signal generation, portfolio tracking, and strategy research on Indian equities.
