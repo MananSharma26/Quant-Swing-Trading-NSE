@@ -49,7 +49,7 @@ def fetch_yfinance_data(symbols: list[str]) -> dict[str, pd.DataFrame]:
     candles = {}
     for sym in symbols:
         try:
-            df = yf.download(f"{sym}.NS", period="5y", interval="1d", progress=False)
+            df = yf.download(f"{sym}.NS", period="10y", interval="1d", progress=False)
             if df.empty:
                 continue
             if isinstance(df.columns, pd.MultiIndex):
@@ -126,7 +126,7 @@ def run_single(candles: dict[str, pd.DataFrame], params: dict, symbol: str) -> d
     return row
 
 def run_sweeper():
-    print("Fetching 5 years of history from Yahoo Finance...")
+    print("Fetching 10 years of history from Yahoo Finance...")
     all_candles = fetch_yfinance_data(SYMBOLS)
     
     # Split Train: Before 2025-01-01, Test: 2025 onwards

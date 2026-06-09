@@ -49,7 +49,7 @@ BB_STD_MULT = 2.0
 def fetch_data(symbol: str) -> pd.DataFrame | None:
     ticker = f"{symbol}.NS"
     try:
-        df = yf.download(ticker, period="5y", interval="1d", progress=False, auto_adjust=True)
+        df = yf.download(ticker, period="10y", interval="1d", progress=False, auto_adjust=True)
         if df.empty:
             return None
         if isinstance(df.columns, pd.MultiIndex):

@@ -3,26 +3,26 @@
     "symbol": "ICICIBANK",
     "optimal_params": {
       "trend_ma_period": 100,
-      "pullback_ma_period": 50,
+      "pullback_ma_period": 20,
       "rsi_oversold": 45.0,
       "stop_loss_pct": 5.0,
       "target_pct": 10.0,
       "max_hold_days": 30
     },
     "train_metrics": {
-      "pullback_ma_period": 50,
+      "pullback_ma_period": 20,
       "rsi_oversold": 45.0,
       "stop_loss_pct": 5.0,
       "target_pct": 10.0,
       "max_hold_days": 30,
       "error": null,
-      "realized_pnl": 377701.34,
-      "win_rate": 0.9230769230769231,
-      "trade_count": 27,
-      "max_drawdown": 0.0572753020207444
+      "realized_pnl": 1839073.14,
+      "win_rate": 0.9705882352941176,
+      "trade_count": 69,
+      "max_drawdown": 0.14372918358079786
     },
     "test_metrics": {
-      "pullback_ma_period": 50,
+      "pullback_ma_period": 20,
       "rsi_oversold": 45.0,
       "stop_loss_pct": 5.0,
       "target_pct": 10.0,
@@ -38,70 +38,105 @@
     "symbol": "LT",
     "optimal_params": {
       "trend_ma_period": 100,
-      "pullback_ma_period": 50,
+      "pullback_ma_period": 20,
       "rsi_oversold": 45.0,
-      "stop_loss_pct": 8.0,
-      "target_pct": 20.0,
-      "max_hold_days": 60
+      "stop_loss_pct": 5.0,
+      "target_pct": 10.0,
+      "max_hold_days": 45
     },
     "train_metrics": {
-      "pullback_ma_period": 50,
+      "pullback_ma_period": 20,
       "rsi_oversold": 45.0,
-      "stop_loss_pct": 8.0,
-      "target_pct": 20.0,
-      "max_hold_days": 60,
+      "stop_loss_pct": 5.0,
+      "target_pct": 10.0,
+      "max_hold_days": 45,
       "error": null,
-      "realized_pnl": 330174.58,
-      "win_rate": 0.9,
-      "trade_count": 21,
-      "max_drawdown": 0.08920271984892077
+      "realized_pnl": 800037.09,
+      "win_rate": 0.9523809523809523,
+      "trade_count": 43,
+      "max_drawdown": 0.18134603959440207
     },
     "test_metrics": {
-      "pullback_ma_period": 50,
+      "pullback_ma_period": 20,
       "rsi_oversold": 45.0,
-      "stop_loss_pct": 8.0,
-      "target_pct": 20.0,
-      "max_hold_days": 60,
+      "stop_loss_pct": 5.0,
+      "target_pct": 10.0,
+      "max_hold_days": 45,
       "error": null,
-      "realized_pnl": 6853.42,
-      "win_rate": 0.5,
-      "trade_count": 4,
-      "max_drawdown": 0.06855383199302323
+      "realized_pnl": 21971.93,
+      "win_rate": 1.0,
+      "trade_count": 8,
+      "max_drawdown": 0.05269094310989361
     }
   },
   {
-    "symbol": "BHARTIARTL",
+    "symbol": "BAJFINANCE",
     "optimal_params": {
       "trend_ma_period": 100,
       "pullback_ma_period": 20,
       "rsi_oversold": 45.0,
       "stop_loss_pct": 5.0,
-      "target_pct": 15.0,
+      "target_pct": 10.0,
       "max_hold_days": 30
     },
     "train_metrics": {
       "pullback_ma_period": 20,
       "rsi_oversold": 45.0,
       "stop_loss_pct": 5.0,
-      "target_pct": 15.0,
+      "target_pct": 10.0,
       "max_hold_days": 30,
       "error": null,
-      "realized_pnl": 269238.64,
-      "win_rate": 0.7,
-      "trade_count": 20,
-      "max_drawdown": 0.10283724010431551
+      "realized_pnl": 2099199.81,
+      "win_rate": 0.9666666666666667,
+      "trade_count": 60,
+      "max_drawdown": 0.13119261077673566
     },
     "test_metrics": {
       "pullback_ma_period": 20,
       "rsi_oversold": 45.0,
       "stop_loss_pct": 5.0,
-      "target_pct": 15.0,
+      "target_pct": 10.0,
       "max_hold_days": 30,
       "error": null,
-      "realized_pnl": 18937.74,
-      "win_rate": 0.6,
-      "trade_count": 10,
-      "max_drawdown": 0.03969699874338773
+      "realized_pnl": 14812.2,
+      "win_rate": 0.75,
+      "trade_count": 8,
+      "max_drawdown": 0.06091100321885359
+    }
+  },
+  {
+    "symbol": "BHARTIARTL",
+    "optimal_params": {
+      "trend_ma_period": 100,
+      "pullback_ma_period": 50,
+      "rsi_oversold": 45.0,
+      "stop_loss_pct": 5.0,
+      "target_pct": 10.0,
+      "max_hold_days": 60
+    },
+    "train_metrics": {
+      "pullback_ma_period": 50,
+      "rsi_oversold": 45.0,
+      "stop_loss_pct": 5.0,
+      "target_pct": 10.0,
+      "max_hold_days": 60,
+      "error": null,
+      "realized_pnl": 644798.04,
+      "win_rate": 1.0,
+      "trade_count": 33,
+      "max_drawdown": 0.17990801366756135
+    },
+    "test_metrics": {
+      "pullback_ma_period": 50,
+      "rsi_oversold": 45.0,
+      "stop_loss_pct": 5.0,
+      "target_pct": 10.0,
+      "max_hold_days": 60,
+      "error": null,
+      "realized_pnl": 15261.85,
+      "win_rate": 1.0,
+      "trade_count": 6,
+      "max_drawdown": 0.025220553921402395
     }
   },
   {
@@ -121,10 +156,10 @@
       "target_pct": 20.0,
       "max_hold_days": 45,
       "error": null,
-      "realized_pnl": 263255.82,
-      "win_rate": 0.6923076923076923,
-      "trade_count": 27,
-      "max_drawdown": 0.13887321302105998
+      "realized_pnl": 1154118.89,
+      "win_rate": 0.9354838709677419,
+      "trade_count": 63,
+      "max_drawdown": 0.10606692715377605
     },
     "test_metrics": {
       "pullback_ma_period": 20,
