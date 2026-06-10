@@ -119,7 +119,8 @@ def run_master_trader(bot_token: str, chat_id: str):
         total_realized += st["realized_pnl"]
         for t in st["today_closed"]:
             new_exits.append(("BB Squeeze", sym, t))
-        if st["in_position"] and st["entry_date"] != st["today_date"]:
+        if st["in_position"] and not st.get("today_entry"):
+            # includes positions filled today at open from yesterday's signal
             locked = st["entry_price"] * st["qty"]
             total_locked += locked
             total_unrealized += st["unrealized_pnl"]
@@ -134,7 +135,7 @@ def run_master_trader(bot_token: str, chat_id: str):
         total_realized += st["realized_pnl"]
         for t in st["today_closed"]:
             new_exits.append(("MA Pullback", sym, t))
-        if st["in_position"] and st["entry_date"] != st["today_date"]:
+        if st["in_position"] and not st.get("today_entry"):
             locked = st["entry_price"] * st["qty"]
             total_locked += locked
             total_unrealized += st["unrealized_pnl"]
@@ -149,7 +150,7 @@ def run_master_trader(bot_token: str, chat_id: str):
         total_realized += st["realized_pnl"]
         for t in st["today_closed"]:
             new_exits.append(("Supertrend", sym, t))
-        if st["in_position"] and st["entry_date"] != st["today_date"]:
+        if st["in_position"] and not st.get("today_entry"):
             locked = st["entry_price"] * st["qty"]
             total_locked += locked
             total_unrealized += st["unrealized_pnl"]
@@ -250,9 +251,11 @@ def run_master_trader(bot_token: str, chat_id: str):
             pnl = t["pnl"]
             emoji = "✅" if pnl >= 0 else "❌"
             sign = "+" if pnl >= 0 else ""
+            entry_d = t.get("entry_date", "?")
             lines.append(f"  {emoji} <b>{sym}</b>  <i>{strat}</i>")
-            lines.append(f"  ├ Sold {t['qty']} shares  ₹{t['entry_price']:,} → ₹{t['exit_price']:,}")
-            lines.append(f"  └ P&L  <b>{sign}₹{pnl:,.0f}</b>  ({t['reason']})")
+            lines.append(f"  ├ Entered {entry_d}  ·  {t['qty']} shares")
+            lines.append(f"  ├ ₹{t['entry_price']:,} → ₹{t['exit_price']:,}  ({t['reason']})")
+            lines.append(f"  └ P&L  <b>{sign}₹{pnl:,.0f}</b>")
 
     # Open positions
     if open_positions:
