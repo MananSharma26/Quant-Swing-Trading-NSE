@@ -286,8 +286,9 @@ def run_master_trader(bot_token: str, chat_id: str):
     if almost_signals:
         lines.append("\n👀 <b>WATCH LIST</b>")
         for strat, label, reason in almost_signals:
+            safe_reason = reason.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             lines.append(f"  <b>{label}</b>  <i>{strat}</i>")
-            lines.append(f"  └ {reason}")
+            lines.append(f"  └ {safe_reason}")
 
     if not fetch_errors and not approved_entries and not new_exits and not open_positions:
         lines.append("\n💤 No positions. No signals today.")
@@ -301,10 +302,10 @@ def run_master_trader(bot_token: str, chat_id: str):
     lines.append("<b>P&amp;L  (since inception)</b>")
     lines.append(
         f"<code>"
-        f"Realised    {r_sign}₹{total_realized:>10,.0f}\n"
-        f"Unrealised  {u_sign}₹{total_unrealized:>10,.0f}\n"
+        f"Realised    {r_sign}{total_realized:>12,.0f}\n"
+        f"Unrealised  {u_sign}{total_unrealized:>12,.0f}\n"
         f"------------------------------\n"
-        f"Total       {t_sign}₹{total:>10,.0f}"
+        f"Total       {t_sign}{total:>12,.0f}"
         f"</code>"
     )
 
