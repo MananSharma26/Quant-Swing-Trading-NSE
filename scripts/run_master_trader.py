@@ -37,9 +37,6 @@ MIN_CHUNK_SIZE = 50_000
 def run_master_trader(bot_token: str, chat_id: str):
     notifier = TelegramNotifier(bot_token=bot_token, chat_id=chat_id)
 
-    # Patch Supertrend paper-trading start to replay full history
-    pt_st.PAPER_TRADING_START = "2000-01-01"
-
     fetch_errors = []     # (strategy_name, label, error_msg)
 
     _log.info("Running Long-Only Black Swan...")
