@@ -252,6 +252,15 @@ def replay_symbol(df: pd.DataFrame, params: dict) -> dict:
     wins = sum(1 for t in closed_trades if t["pnl"] > 0)
     win_rate = wins / len(closed_trades) if closed_trades else 0.0
 
+    # Almost-signal: not in position and price is within 3% below bullish flip level
+    almost_signal = None
+    if not in_position and bands_ready and prev_final_upper != float("inf"):
+        pct_to_flip = (prev_final_upper - closes[-1]) / closes[-1] * 100
+        if 0 < pct_to_flip <= 3.0:
+            almost_signal = {
+                "reason": f"price {pct_to_flip:.1f}% below bullish flip at ₹{prev_final_upper:.2f}"
+            }
+
     return {
         "in_position": in_position,
         "entry_price": round(entry_price, 2) if in_position else None,
@@ -270,6 +279,7 @@ def replay_symbol(df: pd.DataFrame, params: dict) -> dict:
         "today_closed": today_closed,
         "today_entry": today_entry,
         "today_date": str(today_date),
+        "almost_signal": almost_signal,
     }
 
 

@@ -180,6 +180,22 @@ def replay_symbol(df: pd.DataFrame, params: dict) -> dict:
     losses = len(closed_trades) - wins
     win_rate = wins / len(closed_trades) if closed_trades else 0.0
 
+    # Almost-signal detection: in a squeeze but haven't broken out yet
+    almost_signal = None
+    if not in_position and n > BB_WINDOW:
+        _wc = closes[n - BB_WINDOW: n]
+        _mid = float(np.mean(_wc))
+        _std = float(np.std(_wc, ddof=1))
+        _upper = _mid + BB_STD_MULT * _std
+        _lower = _mid - BB_STD_MULT * _std
+        _bw = (_upper - _lower) / _mid if _mid > 0 else 999.0
+        if _bw < sq_thresh:
+            pct_to_breakout = (_upper - closes[-1]) / closes[-1] * 100
+            almost_signal = {
+                "reason": f"BB squeeze active (bw={_bw:.3f} < {sq_thresh}), "
+                          f"price {pct_to_breakout:.1f}% below breakout at ₹{_upper:.2f}"
+            }
+
     return {
         "in_position": in_position,
         "entry_price": round(entry_price, 2) if in_position else None,
@@ -198,6 +214,7 @@ def replay_symbol(df: pd.DataFrame, params: dict) -> dict:
         "today_closed": today_closed,
         "today_entry": today_entry,
         "today_date": str(today_date),
+        "almost_signal": almost_signal,
     }
 
 

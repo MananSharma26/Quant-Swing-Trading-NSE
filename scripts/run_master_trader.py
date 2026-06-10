@@ -89,6 +89,7 @@ def run_master_trader(bot_token: str, chat_id: str):
     open_positions = []
     new_exits = []
     raw_new_entries = []  # (strategy_name, symbol, entry_dict)
+    almost_signals = []   # (strategy_name, symbol_or_pair, reason_str)
 
     # 1. Process Swan
     for r in swan_results:
@@ -110,6 +111,8 @@ def run_master_trader(bot_token: str, chat_id: str):
                     "entry_price": r["entry_price"],
                     "qty": r["entry_qty"],
                 }))
+        elif r.get("almost_signal"):
+            almost_signals.append(("Black Swan", r["pair"], r["almost_signal"]["reason"]))
 
     # 2. Process BB Squeeze
     for sym, st in bb_states:
@@ -123,6 +126,8 @@ def run_master_trader(bot_token: str, chat_id: str):
             open_positions.append(("BB Squeeze", sym, st))
         if st["today_entry"]:
             raw_new_entries.append(("BB Squeeze", sym, st["today_entry"]))
+        elif not st["in_position"] and st.get("almost_signal"):
+            almost_signals.append(("BB Squeeze", sym, st["almost_signal"]["reason"]))
 
     # 3. Process MA Pullback
     for sym, st in ma_states:
@@ -136,6 +141,8 @@ def run_master_trader(bot_token: str, chat_id: str):
             open_positions.append(("MA Pullback", sym, st))
         if st["today_entry"]:
             raw_new_entries.append(("MA Pullback", sym, st["today_entry"]))
+        elif not st["in_position"] and st.get("almost_signal"):
+            almost_signals.append(("MA Pullback", sym, st["almost_signal"]["reason"]))
 
     # 4. Process Supertrend
     for sym, st in st_states:
@@ -149,6 +156,8 @@ def run_master_trader(bot_token: str, chat_id: str):
             open_positions.append(("Supertrend", sym, st))
         if st["today_entry"]:
             raw_new_entries.append(("Supertrend", sym, st["today_entry"]))
+        elif not st["in_position"] and st.get("almost_signal"):
+            almost_signals.append(("Supertrend", sym, st["almost_signal"]["reason"]))
 
     # Dynamic Capital Allocation
     # If any strategy had a fetch error, capital accounting is untrustworthy.
@@ -244,6 +253,11 @@ def run_master_trader(bot_token: str, chat_id: str):
                 upnl = st["unrealized_pnl"]
                 sign = "+" if upnl >= 0 else ""
                 lines.append(f"  [{strat}] {sym}: {st['qty']} shares @ ₹{st['entry_price']:,} -> Unrealised: {sign}₹{upnl:,.0f}")
+
+    if almost_signals:
+        lines.append("\n👀 ALMOST SIGNALS (watch list)")
+        for strat, label, reason in almost_signals:
+            lines.append(f"  [{strat}] {label}: {reason}")
 
     if not fetch_errors and not approved_entries and not new_exits and not open_positions:
         lines.append("\n💤 No open positions. No signals today.")

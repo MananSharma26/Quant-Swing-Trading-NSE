@@ -98,6 +98,7 @@ def replay_pair(sym_a: str, sym_b: str, params: dict) -> dict:
     entry_qty = 0
     entry_date: pd.Timestamp | None = None
     stop_price = 0.0
+    last_z = 0.0  # track latest z-score for almost-signal detection
 
     realized_pnl = 0.0
     closed_trades: list[dict] = []   # all closed trades
@@ -123,6 +124,7 @@ def replay_pair(sym_a: str, sym_b: str, params: dict) -> dict:
         if std_r == 0:
             continue
         z = (ratio - mean_r) / std_r
+        last_z = z
         is_today = (ts.date() == today_date)
         days_held = (ts - entry_date).days if entry_date else 0
 
@@ -211,6 +213,14 @@ def replay_pair(sym_a: str, sym_b: str, params: dict) -> dict:
 
     unrealized_pnl = round((current_price - entry_price) * entry_qty, 2) if position else 0.0
 
+    # Almost-signal: z-score approaching entry threshold (within 75%)
+    almost_signal = None
+    if not position and abs(last_z) >= entry_z * 0.75:
+        side = sym_a if last_z <= -entry_z * 0.75 else sym_b
+        almost_signal = {
+            "reason": f"z-score {last_z:.2f} approaching entry at +/-{entry_z} (buy {side})"
+        }
+
     return {
         "pair": f"{sym_a}/{sym_b}",
         "sym_a": sym_a,
@@ -227,6 +237,7 @@ def replay_pair(sym_a: str, sym_b: str, params: dict) -> dict:
         "wins": sum(1 for t in closed_trades if t["pnl"] > 0),
         "today_closed": today_closed,
         "today_date": str(today_date),
+        "almost_signal": almost_signal,
         "error": None,
     }
 

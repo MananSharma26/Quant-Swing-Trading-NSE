@@ -222,6 +222,26 @@ def replay_symbol(df: pd.DataFrame, params: dict) -> dict:
     wins = sum(1 for t in closed_trades if t["pnl"] > 0)
     win_rate = wins / len(closed_trades) if closed_trades else 0.0
 
+    # Almost-signal detection (only when not in position)
+    almost_signal = None
+    if not in_position and len(close_history) >= trend_period:
+        _trend_sma = sum(close_history[-trend_period:]) / trend_period
+        _pull_sma = sum(close_history[-pullback_period:]) / pullback_period
+        _rsi = 100.0 if avg_loss == 0 and avg_gain > 0 else (
+            50.0 if avg_loss == 0 else 100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
+        )
+        _c = closes[-1]
+        in_uptrend = _c > _trend_sma
+        pct_above_pull = (_c - _pull_sma) / _pull_sma * 100 if _pull_sma > 0 else 999.0
+        rsi_gap = _rsi - rsi_oversold
+        if in_uptrend and (pct_above_pull <= 3.0 or rsi_gap <= 5.0):
+            reasons = []
+            if pct_above_pull <= 3.0:
+                reasons.append(f"price {pct_above_pull:.1f}% above pullback MA")
+            if rsi_gap <= 5.0:
+                reasons.append(f"RSI {_rsi:.1f} (entry at <={rsi_oversold})")
+            almost_signal = {"reason": ", ".join(reasons)}
+
     return {
         "in_position": in_position,
         "entry_price": round(entry_price, 2) if in_position else None,
@@ -241,6 +261,7 @@ def replay_symbol(df: pd.DataFrame, params: dict) -> dict:
         "today_closed": today_closed,
         "today_entry": today_entry,
         "today_date": str(today_date),
+        "almost_signal": almost_signal,
     }
 
 
