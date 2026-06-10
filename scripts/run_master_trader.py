@@ -202,79 +202,112 @@ def run_master_trader(bot_token: str, chat_id: str):
             for strat, sym, e in rejected:
                 rejected_entries.append((strat, sym, "Ranked out (Max slots reached)"))
 
-    # Build Unified Digest
+    # ── Build Unified Digest (HTML) ──────────────────────────────────
     today = datetime.now().strftime("%d %b %Y")
-    lines = [f"👑 MASTER RISK ENGINE — {today}"]
-    lines.append("=" * 35)
+    used_pct = int((total_locked / TOTAL_ACCOUNT_CAPITAL) * 100)
+    bar_filled = used_pct // 10
+    capital_bar = "█" * bar_filled + "░" * (10 - bar_filled)
 
-    # Fetch error warnings at the top — capital may be understated
+    lines = []
+
+    # Header
+    lines.append(f"<b>👑 MASTER ENGINE</b>  ·  {today}")
+    lines.append("─" * 32)
+
+    # Capital row
+    lines.append(
+        f"💰 <b>₹{free_cash:,.0f}</b> free  "
+        f"🔒 ₹{total_locked:,.0f} locked\n"
+        f"<code>[{capital_bar}] {used_pct}% deployed</code>"
+    )
+
+    # Fetch errors
     if fetch_errors:
-        lines.append("\n⚠️ DATA FETCH ERRORS — New entries blocked")
+        lines.append("\n⚠️ <b>DATA ERRORS — entries blocked</b>")
         for strat, label, msg in fetch_errors:
             lines.append(f"  [{strat}] {label}: {msg}")
 
-    # Portfolio Status
-    lines.append(f"\n💰 Account Limit: ₹{TOTAL_ACCOUNT_CAPITAL:,.0f}")
-    lines.append(f"🔒 Locked Cash  : ₹{total_locked:,.0f}")
-    lines.append(f"💸 Free Cash    : ₹{free_cash:,.0f}")
-    lines.append("-" * 35)
-
+    # Approved entries
     if approved_entries:
-        lines.append("\n🟢 APPROVED ENTRIES (Dynamically Sized)")
+        lines.append("\n🟢 <b>NEW ENTRIES</b>")
         for strat, sym, e in approved_entries:
-            lines.append(f"  [{strat}] {sym}")
-            lines.append(f"    BUY {e['qty']} shares @ ₹{e['entry_price']:,}")
-            lines.append(f"    Allocated: ₹{e['capital']:,.0f}")
+            lines.append(f"  <b>{sym}</b>  <i>{strat}</i>")
+            lines.append(f"  ├ BUY {e['qty']} shares @ ₹{e['entry_price']:,}")
+            lines.append(f"  ├ Allocated  ₹{e['capital']:,.0f}")
             if "stop_loss" in e:
-                lines.append(f"    Stop loss: ₹{e['stop_loss']:,.2f}")
+                lines.append(f"  └ Stop loss  ₹{e['stop_loss']:,}")
 
+    # Rejected entries
     if rejected_entries:
-        lines.append("\n🟡 REJECTED ENTRIES (Capital Protection)")
+        lines.append("\n🟡 <b>REJECTED</b>")
         for strat, sym, reason in rejected_entries:
-            lines.append(f"  [{strat}] {sym} - {reason}")
+            lines.append(f"  {sym} [{strat}] — {reason}")
 
+    # Exits
     if new_exits:
-        lines.append("\n🔴 EXITS TODAY")
+        lines.append("\n🔴 <b>EXITS TODAY</b>")
         for strat, sym, t in new_exits:
             pnl = t["pnl"]
             emoji = "✅" if pnl >= 0 else "❌"
             sign = "+" if pnl >= 0 else ""
-            lines.append(f"  {emoji} [{strat}] {sym}: SELL {t['qty']} shares")
-            lines.append(f"    P&L: {sign}₹{pnl:,.0f}")
+            lines.append(f"  {emoji} <b>{sym}</b>  <i>{strat}</i>")
+            lines.append(f"  ├ Sold {t['qty']} shares  ₹{t['entry_price']:,} → ₹{t['exit_price']:,}")
+            lines.append(f"  └ P&L  <b>{sign}₹{pnl:,.0f}</b>  ({t['reason']})")
 
+    # Open positions
     if open_positions:
-        lines.append("\n📂 OPEN POSITIONS")
+        lines.append("\n📂 <b>OPEN POSITIONS</b>")
         for strat, sym, st in open_positions:
             if strat == "Black Swan":
                 upnl = st["unrealized_pnl"]
                 sign = "+" if upnl >= 0 else ""
-                lines.append(f"  [{strat}] {sym}: {st['entry_qty']} shares @ ₹{st['entry_price']:,} -> Unrealised: {sign}₹{upnl:,.0f}")
+                entry_p = st["entry_price"]
+                pct = (upnl / (entry_p * st["entry_qty"])) * 100 if entry_p and st["entry_qty"] else 0
+                lines.append(f"  <b>{sym}</b>  <i>{strat}</i>")
+                lines.append(f"  ├ {st['entry_qty']} shares @ ₹{entry_p:,}  since {st['entry_date']}")
+                lines.append(f"  └ Unrealised  <b>{sign}₹{upnl:,.0f}</b> ({pct:+.1f}%)")
             else:
                 upnl = st["unrealized_pnl"]
                 sign = "+" if upnl >= 0 else ""
-                lines.append(f"  [{strat}] {sym}: {st['qty']} shares @ ₹{st['entry_price']:,} -> Unrealised: {sign}₹{upnl:,.0f}")
+                entry_p = st["entry_price"]
+                pct = (upnl / (entry_p * st["qty"])) * 100 if entry_p and st["qty"] else 0
+                lines.append(f"  <b>{sym}</b>  <i>{strat}</i>")
+                lines.append(f"  ├ {st['qty']} shares @ ₹{entry_p:,}  since {st['entry_date']}")
+                if st.get("stop_price"):
+                    target_str = f"  Target ₹{st['target_price']:,}" if st.get("target_price") else ""
+                    lines.append(f"  ├ Stop ₹{st['stop_price']:,}{target_str}")
+                lines.append(f"  ├ Unrealised  <b>{sign}₹{upnl:,.0f}</b> ({pct:+.1f}%)")
+                lines.append(f"  └ Day {st.get('days_held', 0)} of {st.get('days_held', 0) + st.get('days_left', 0)}")
 
+    # Almost signals
     if almost_signals:
-        lines.append("\n👀 ALMOST SIGNALS (watch list)")
+        lines.append("\n👀 <b>WATCH LIST</b>")
         for strat, label, reason in almost_signals:
-            lines.append(f"  [{strat}] {label}: {reason}")
+            lines.append(f"  <b>{label}</b>  <i>{strat}</i>")
+            lines.append(f"  └ {reason}")
 
     if not fetch_errors and not approved_entries and not new_exits and not open_positions:
-        lines.append("\n💤 No open positions. No signals today.")
+        lines.append("\n💤 No positions. No signals today.")
 
-    lines.append("\n" + "─" * 35)
-    lines.append("GLOBAL P&L SUMMARY (Since Inception)")
+    # P&L summary
     total = total_realized + total_unrealized
     r_sign = "+" if total_realized >= 0 else ""
     u_sign = "+" if total_unrealized >= 0 else ""
     t_sign = "+" if total >= 0 else ""
-    lines.append(f"  Realised  : {r_sign}₹{total_realized:,.0f}")
-    lines.append(f"  Unrealised: {u_sign}₹{total_unrealized:,.0f}")
-    lines.append(f"  Total     : {t_sign}₹{total:,.0f}")
+    lines.append("\n────────────────────────────────")
+    lines.append("<b>P&amp;L  (since inception)</b>")
+    lines.append(
+        f"<code>"
+        f"Realised    {r_sign}₹{total_realized:>10,.0f}\n"
+        f"Unrealised  {u_sign}₹{total_unrealized:>10,.0f}\n"
+        f"------------------------------\n"
+        f"Total       {t_sign}₹{total:>10,.0f}"
+        f"</code>"
+    )
 
     digest = "\n".join(lines)
     _log.info("Sending Master Digest:\n" + digest)
-    notifier.send(digest)
+    notifier.send(digest, parse_mode="HTML")
 
 
 if __name__ == "__main__":

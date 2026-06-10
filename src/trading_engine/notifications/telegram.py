@@ -54,12 +54,20 @@ class TelegramNotifier:
     # Public helpers — called by the runner
     # ------------------------------------------------------------------
 
-    def send(self, text: str) -> None:
-        """Send a plain-text message. Silently swallows errors."""
+    def send(self, text: str, parse_mode: str | None = None) -> None:
+        """Send a message. Silently swallows errors.
+
+        Args:
+            text:       Message text. Use HTML tags if parse_mode="HTML".
+            parse_mode: "HTML", "MarkdownV2", or None for plain text.
+        """
         if not self._enabled:
             return
         url = _TELEGRAM_API.format(token=self._token)
-        payload = json.dumps({"chat_id": self._chat_id, "text": text}).encode()
+        body: dict = {"chat_id": self._chat_id, "text": text}
+        if parse_mode:
+            body["parse_mode"] = parse_mode
+        payload = json.dumps(body).encode()
         req = urllib.request.Request(
             url,
             data=payload,
