@@ -28,6 +28,8 @@ import run_bb_squeeze_trader as pt_bb
 import run_ma_pullback_trader as pt_ma
 import run_supertrend_trader as pt_st
 
+from trading_engine.strategy_priority import strategy_score
+
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 _log = logging.getLogger(__name__)
 
@@ -233,33 +235,54 @@ def run_master_trader(bot_token: str, chat_id: str):
             for strat, sym, e in raw_new_entries:
                 rejected_entries.append((strat, sym, "Insufficient Free Cash"))
         else:
-            # Rank: MA Pullback > BB Squeeze = Supertrend > Black Swan
-            def strat_score(s):
-                if s[0] == "MA Pullback": return 3
-                if s[0] in ("BB Squeeze", "Supertrend"): return 2
-                return 1
+            raw_new_entries.sort(key=lambda s: strategy_score(s[0]), reverse=True)
 
-            raw_new_entries.sort(key=strat_score, reverse=True)
+            # Rule 1: deduplicate by symbol — keep highest-priority strategy only
+            seen_syms: set[str] = set()
+            deduped = []
+            for entry in raw_new_entries:
+                sym = entry[1]
+                if sym not in seen_syms:
+                    seen_syms.add(sym)
+                    deduped.append(entry)
+                else:
+                    rejected_entries.append((entry[0], entry[1], "Duplicate symbol — already taken by higher-priority strategy"))
+            raw_new_entries = deduped
 
-            max_slots = int(free_cash // MIN_CHUNK_SIZE)
-            selected = raw_new_entries[:max_slots]
-            rejected = raw_new_entries[max_slots:]
+            # Rule 2: skip symbols already held in any open position
+            held_syms: set[str] = {sym for _, sym, _ in open_positions}
+            filtered = []
+            for entry in raw_new_entries:
+                sym = entry[1]
+                if sym not in held_syms:
+                    filtered.append(entry)
+                else:
+                    holder = next((s for s, ps, _ in open_positions if ps == sym), "another strategy")
+                    rejected_entries.append((entry[0], entry[1], f"Already held via {holder}"))
+            raw_new_entries = filtered
 
-            chunk_size = free_cash / len(selected)
+            if not raw_new_entries:
+                pass
+            else:
+                max_slots = int(free_cash // MIN_CHUNK_SIZE)
+                selected = raw_new_entries[:max_slots]
+                rejected = raw_new_entries[max_slots:]
 
-            for strat, sym, e in selected:
-                new_qty = max(1, int(chunk_size / e["entry_price"]))
-                e["qty"] = new_qty
-                e["capital"] = new_qty * e["entry_price"]
-                approved_entries.append((strat, sym, e))
-                # Persist to ledger so tomorrow's exits use correct qty
-                ledger[f"{strat}/{sym}"] = {
-                    "qty": new_qty,
-                    "entry_price": e["entry_price"],
-                }
+                chunk_size = free_cash / len(selected)
 
-            for strat, sym, e in rejected:
-                rejected_entries.append((strat, sym, "Ranked out (Max slots reached)"))
+                for strat, sym, e in selected:
+                    new_qty = max(1, int(chunk_size / e["entry_price"]))
+                    e["qty"] = new_qty
+                    e["capital"] = new_qty * e["entry_price"]
+                    approved_entries.append((strat, sym, e))
+                    # Persist to ledger so tomorrow's exits use correct qty
+                    ledger[f"{strat}/{sym}"] = {
+                        "qty": new_qty,
+                        "entry_price": e["entry_price"],
+                    }
+
+                for strat, sym, e in rejected:
+                    rejected_entries.append((strat, sym, "Ranked out (Max slots reached)"))
 
     # ── Build Unified Digest (HTML) ──────────────────────────────────
     today = datetime.now().strftime("%d %b %Y")
