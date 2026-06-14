@@ -258,6 +258,7 @@ def replay_symbol(df: pd.DataFrame, params: dict) -> dict:
         "wins": wins,
         "losses": len(closed_trades) - wins,
         "win_rate": round(win_rate, 3),
+        "closed_trades": closed_trades,
         "today_closed": today_closed,
         "today_entry": today_entry,
         "today_date": str(today_date),

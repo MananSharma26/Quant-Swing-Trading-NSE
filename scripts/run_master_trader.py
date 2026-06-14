@@ -126,9 +126,10 @@ def run_master_trader(bot_token: str, chat_id: str):
                 total_unrealized += r["unrealized_pnl"]
                 open_positions.append(("Black Swan", r["pair"], r))
             else:
-                raw_new_entries.append(("Black Swan", r["bought_sym"], {
+                raw_new_entries.append(("Black Swan", r["pair"], {
                     "entry_price": r["entry_price"],
                     "qty": r["entry_qty"],
+                    "bought_sym": r["bought_sym"],
                 }))
         elif r.get("almost_signal"):
             almost_signals.append(("Black Swan", r["pair"], r["almost_signal"]["reason"]))
@@ -186,10 +187,14 @@ def run_master_trader(bot_token: str, chat_id: str):
     def _pos_key(strat: str, sym: str) -> str:
         return f"{strat}/{sym}"
 
+    def _sym_parts(sym: str) -> set[str]:
+        """Individual tickers inside a symbol. 'A/B' → {'A','B'}, 'A' → {'A'}."""
+        return set(sym.split("/"))
+
     open_positions = [
         (strat, sym, st) for strat, sym, st in open_positions
         if _pos_key(strat, sym) in ledger
-        or st.get("entry_date", "") < PAPER_TRADING_START
+        or (st.get("entry_date") is not None and st.get("entry_date") < PAPER_TRADING_START)
     ]
 
     # Correct exit qty/pnl using master ledger, then remove closed positions from ledger
@@ -202,6 +207,9 @@ def run_master_trader(bot_token: str, chat_id: str):
             t = dict(t)  # don't mutate strategy's object
             t["qty"] = master_qty
             t["pnl"] = round((t["exit_price"] - entry_p) * master_qty, 2)
+            # Accumulate corrected P&L into ledger stats before removing key
+            stats = ledger.setdefault("_stats", {"realized_pnl": 0.0})
+            stats["realized_pnl"] = round(stats["realized_pnl"] + t["pnl"], 2)
             del ledger[key]
         corrected_exits.append((strat, sym, t))
     new_exits = corrected_exits
@@ -209,6 +217,7 @@ def run_master_trader(bot_token: str, chat_id: str):
     # Correct open position qty/unrealized using ledger, recompute locked capital
     total_locked = 0.0
     total_unrealized = 0.0
+    ledger_unrealized = 0.0   # unrealized P&L for ledger-tracked positions only
     corrected_open = []
     for strat, sym, st in open_positions:
         key = f"{strat}/{sym}"
@@ -223,6 +232,7 @@ def run_master_trader(bot_token: str, chat_id: str):
             st["unrealized_pnl"] = round((last_c - entry_p) * master_qty, 2)
             total_locked += entry_p * master_qty
             total_unrealized += st["unrealized_pnl"]
+            ledger_unrealized += st["unrealized_pnl"]
         else:
             total_locked += (st.get("entry_price") or 0) * (st.get("qty") or st.get("entry_qty") or 0)
             total_unrealized += st.get("unrealized_pnl", 0)
@@ -252,26 +262,35 @@ def run_master_trader(bot_token: str, chat_id: str):
             raw_new_entries.sort(key=lambda s: strategy_score(s[0]), reverse=True)
 
             # Rule 1: deduplicate by symbol — keep highest-priority strategy only
+            # Use _sym_parts so "ICICIBANK/AXISBANK" matches individual "ICICIBANK"
             seen_syms: set[str] = set()
             deduped = []
             for entry in raw_new_entries:
                 sym = entry[1]
-                if sym not in seen_syms:
-                    seen_syms.add(sym)
+                parts = _sym_parts(sym)
+                if not parts.intersection(seen_syms):
+                    seen_syms.update(parts)
                     deduped.append(entry)
                 else:
                     rejected_entries.append((entry[0], entry[1], "Duplicate symbol — already taken by higher-priority strategy"))
             raw_new_entries = deduped
 
             # Rule 2: skip symbols already held in any open position
-            held_syms: set[str] = {sym for _, sym, _ in open_positions}
+            # Expand pair names so "ICICIBANK/AXISBANK" blocks a new "ICICIBANK" entry
+            held_syms: set[str] = set()
+            for _, sym, _ in open_positions:
+                held_syms.update(_sym_parts(sym))
             filtered = []
             for entry in raw_new_entries:
                 sym = entry[1]
-                if sym not in held_syms:
+                parts = _sym_parts(sym)
+                if not parts.intersection(held_syms):
                     filtered.append(entry)
                 else:
-                    holder = next((s for s, ps, _ in open_positions if ps == sym), "another strategy")
+                    holder = next(
+                        (s for s, ps, _ in open_positions if _sym_parts(ps).intersection(parts)),
+                        "another strategy",
+                    )
                     rejected_entries.append((entry[0], entry[1], f"Already held via {holder}"))
             raw_new_entries = filtered
 
@@ -328,7 +347,10 @@ def run_master_trader(bot_token: str, chat_id: str):
         lines.append("\n🟢 <b>NEW ENTRIES</b>")
         for strat, sym, e in approved_entries:
             lines.append(f"  <b>{sym}</b>  <i>{strat}</i>")
-            lines.append(f"  ├ BUY {e['qty']} shares @ ₹{e['entry_price']:,}")
+            if "bought_sym" in e:
+                lines.append(f"  ├ BUY {e['qty']} × {e['bought_sym']} @ ₹{e['entry_price']:,}")
+            else:
+                lines.append(f"  ├ BUY {e['qty']} shares @ ₹{e['entry_price']:,}")
             lines.append(f"  ├ Allocated  ₹{e['capital']:,.0f}")
             if "stop_loss" in e:
                 lines.append(f"  └ Stop loss  ₹{e['stop_loss']:,}")
@@ -388,19 +410,20 @@ def run_master_trader(bot_token: str, chat_id: str):
     if not fetch_errors and not approved_entries and not new_exits and not open_positions:
         lines.append("\n💤 No positions. No signals today.")
 
-    # P&L summary
-    total = total_realized + total_unrealized
-    r_sign = "+" if total_realized >= 0 else ""
-    u_sign = "+" if total_unrealized >= 0 else ""
-    t_sign = "+" if total >= 0 else ""
+    # P&L summary — ledger-tracked values only (master-allocated qty, since paper trading start)
+    ledger_realized = ledger.get("_stats", {}).get("realized_pnl", 0.0)
+    paper_total = ledger_realized + ledger_unrealized
+    r_sign = "+" if ledger_realized >= 0 else ""
+    u_sign = "+" if ledger_unrealized >= 0 else ""
+    t_sign = "+" if paper_total >= 0 else ""
     lines.append("\n────────────────────────────────")
-    lines.append("<b>P&amp;L  (since inception)</b>")
+    lines.append(f"<b>P&amp;L  (since {PAPER_TRADING_START})</b>")
     lines.append(
         f"<code>"
-        f"Realised    {r_sign}{total_realized:>12,.0f}\n"
-        f"Unrealised  {u_sign}{total_unrealized:>12,.0f}\n"
+        f"Realised    {r_sign}{ledger_realized:>12,.0f}\n"
+        f"Unrealised  {u_sign}{ledger_unrealized:>12,.0f}\n"
         f"------------------------------\n"
-        f"Total       {t_sign}{total:>12,.0f}"
+        f"Total       {t_sign}{paper_total:>12,.0f}"
         f"</code>"
     )
 

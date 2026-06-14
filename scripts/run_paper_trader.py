@@ -235,6 +235,7 @@ def replay_pair(sym_a: str, sym_b: str, params: dict) -> dict:
         "realized_pnl": round(realized_pnl, 2),
         "total_trades": len(closed_trades),
         "wins": sum(1 for t in closed_trades if t["pnl"] > 0),
+        "closed_trades": closed_trades,
         "today_closed": today_closed,
         "today_date": str(today_date),
         "almost_signal": almost_signal,
