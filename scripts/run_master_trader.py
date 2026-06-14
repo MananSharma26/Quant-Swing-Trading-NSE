@@ -34,7 +34,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 _log = logging.getLogger(__name__)
 
 TOTAL_ACCOUNT_CAPITAL = 2_00_000
-MIN_CHUNK_SIZE = 50_000
+MIN_CHUNK_SIZE = 40_000
 LEDGER_PATH = ROOT / "reports" / "master_position_ledger.json"
 
 
