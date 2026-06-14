@@ -6,8 +6,8 @@ Higher number = higher priority. Used for:
 """
 
 PRIORITY = {
-    "Supertrend":  4,
-    "MA Pullback": 3,
+    "MA Pullback": 4,
+    "Supertrend":  3,
     "BB Squeeze":  2,
     "Black Swan":  1,
 }
